@@ -1,0 +1,34 @@
+﻿[
+  {
+    "Name": "Get ECU Info",
+    "Description": "Retrieves hardware and firmware information from the ECU.",
+    "MessageClass": "0x04",
+    "MessageCommand": "0x00",
+    "PayloadTemplate": []
+  },
+  {
+    "Name": "Get Table",
+    "Description": "Retrieves a full data table from the ECU.",
+    "MessageClass": "0x01",
+    "MessageCommand": "0x01",
+    "PayloadTemplate": [
+      {
+        "Name": "TableId",
+        "Type": "ushort"
+      }
+    ]
+  },
+  {
+    "Name": "Set Reporting State",
+    "Description": "Enables or disables real-time data reporting from the ECU.",
+    "MessageClass": "0x00",
+    "MessageCommand": "0x02",
+    "PayloadTemplate": [
+      {
+        "Name": "Enabled",
+        "Type": "bool",
+        "DefaultValue": true
+      }
+    ]
+  }
+]
