@@ -1,34 +1,30 @@
 ﻿[
   {
     "Name": "Get ECU Info",
-    "Description": "Retrieves hardware and firmware information from the ECU.",
-    "MessageClass": "0x04",
-    "MessageCommand": "0x00",
-    "PayloadTemplate": []
+    "Description": "Retrieves hardware and firmware information from the ECU."
   },
   {
-    "Name": "Get Table",
-    "Description": "Retrieves a full data table from the ECU.",
-    "MessageClass": "0x01",
-    "MessageCommand": "0x01",
-    "PayloadTemplate": [
-      {
-        "Name": "TableId",
-        "Type": "ushort"
-      }
-    ]
+    "Name": "Get Object List (Tables/Drivers)",
+    "Description": "Retrieves a list of all available Tables and Drivers from the ECU."
   },
   {
-    "Name": "Set Reporting State",
-    "Description": "Enables or disables real-time data reporting from the ECU.",
-    "MessageClass": "0x00",
-    "MessageCommand": "0x02",
-    "PayloadTemplate": [
-      {
-        "Name": "Enabled",
-        "Type": "bool",
-        "DefaultValue": true
-      }
-    ]
+    "Name": "Get DataLink List",
+    "Description": "Retrieves a list of all available DataLinks from the ECU."
+  },
+  {
+    "Name": "Get Single DataLink Value",
+    "Description": "Reads and displays the current value for a single DataLink."
+  },
+  {
+    "Name": "Get Table by ID",
+    "Description": "Retrieves a full data table from the ECU."
+  },
+  {
+    "Name": "Get Driver by ID",
+    "Description": "Retrieves a full driver configuration from the ECU."
+  },
+  {
+    "Name": "Start Real-time Data Stream",
+    "Description": "Starts a continuous stream of all DataLink values."
   }
 ]

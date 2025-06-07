@@ -2,36 +2,52 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Configuration;
 using System.IO.Ports;
+using System.Text;
 using System.Text.Json;
 using ME221CrossApp.Models;
 using ME221CrossApp.Services;
-using ME221CrossApp.Services.Helpers;
 
 await Host.CreateDefaultBuilder(args)
-    .ConfigureServices((_, services) =>
+    .ConfigureServices((hostContext, services) =>
     {
         services.AddSingleton<IDeviceCommunicator, DeviceCommunicator>();
+        services.AddSingleton<IEcuDefinitionService, EcuDefinitionService>();
+        services.AddSingleton<IEcuInteractionService, EcuInteractionService>();
         services.AddHostedService<ConsoleEcuHost>();
     })
     .RunConsoleAsync();
 
-public class ConsoleEcuHost(
-    IHostApplicationLifetime appLifetime,
-    IConfiguration config,
-    IDeviceCommunicator communicator)
-    : IHostedService
+public class ConsoleEcuHost : IHostedService
 {
+    private readonly IHostApplicationLifetime _appLifetime;
+    private readonly IConfiguration _config;
+    private readonly IDeviceCommunicator _communicator;
+    private readonly IEcuDefinitionService _definitionService;
+    private readonly IEcuInteractionService _ecuInteractionService;
     private List<Operation> _operations = [];
+
+    public ConsoleEcuHost(
+        IHostApplicationLifetime appLifetime, 
+        IConfiguration config,
+        IDeviceCommunicator communicator,
+        IEcuDefinitionService definitionService,
+        IEcuInteractionService ecuInteractionService)
+    {
+        _appLifetime = appLifetime;
+        _config = config;
+        _communicator = communicator;
+        _definitionService = definitionService;
+        _ecuInteractionService = ecuInteractionService;
+    }
 
     public Task StartAsync(CancellationToken cancellationToken)
     {
-        appLifetime.ApplicationStarted.Register(() =>
+        _appLifetime.ApplicationStarted.Register(() =>
         {
             Task.Run(async () =>
             {
                 try
                 {
-                    LoadOperations();
                     await RunMainLoop(cancellationToken);
                 }
                 catch (Exception ex)
@@ -42,18 +58,15 @@ public class ConsoleEcuHost(
                 }
                 finally
                 {
-                    appLifetime.StopApplication();
+                    _appLifetime.StopApplication();
                 }
             }, cancellationToken);
         });
         return Task.CompletedTask;
     }
 
-    public Task StopAsync(CancellationToken cancellationToken)
-    {
-        return Task.CompletedTask;
-    }
-    
+    public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
     private void LoadOperations()
     {
         var json = File.ReadAllText("operations.json");
@@ -63,14 +76,19 @@ public class ConsoleEcuHost(
     private async Task RunMainLoop(CancellationToken token)
     {
         Console.WriteLine("--- .NET 9 ECU Communicator ---");
+        await _definitionService.LoadFromStoreAsync(token);
+        var initialDef = _definitionService.GetDefinition();
+        Console.WriteLine($"Loaded {initialDef?.EcuObjects.Count ?? 0} definitions from local store.");
+
+        LoadOperations();
         
         var portName = SelectPort();
         if (string.IsNullOrEmpty(portName)) return;
 
-        var baudRate = config.GetValue<int>("BaudRate");
+        var baudRate = _config.GetValue<int>("BaudRate");
         Console.WriteLine($"Connecting to {portName} at {baudRate} baud...");
 
-        await communicator.ConnectAsync(portName, baudRate, token);
+        await _communicator.ConnectAsync(portName, baudRate, token);
         Console.ForegroundColor = ConsoleColor.Green;
         Console.WriteLine("Connection successful.");
         Console.ResetColor();
@@ -80,37 +98,191 @@ public class ConsoleEcuHost(
             var operation = SelectOperation();
             if (operation is null) break;
 
-            var payload = await BuildPayload(operation, token);
-            
-            var request = new Message(
-                Type: 0x00, // REQ
-                Class: Convert.ToByte(operation.MessageClass, 16),
-                Command: Convert.ToByte(operation.MessageCommand, 16),
-                Payload: payload
-            );
-
-            Console.WriteLine("\nSending request...");
             try
             {
-                var response = await communicator.SendMessageAsync(request, TimeSpan.FromSeconds(5), token);
-                Console.ForegroundColor = ConsoleColor.Cyan;
-                Console.WriteLine("Response Received:");
-                Console.WriteLine($"  Type: 0x{response.Type:X2}");
-                Console.WriteLine($"  Class: 0x{response.Class:X2}");
-                Console.WriteLine($"  Command: 0x{response.Command:X2}");
-                Console.WriteLine($"  Payload: {BitConverter.ToString(response.Payload).Replace("-", " ")}");
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.WriteLine($"\nExecuting: {operation.Name}...");
                 Console.ResetColor();
+
+                switch (operation.Name)
+                {
+                    case "Get ECU Info":
+                        await GetEcuInfoAsync(token);
+                        break;
+                    case "Get Object List (Tables/Drivers)":
+                        await GetObjectListAsync(token);
+                        break;
+                    case "Get DataLink List":
+                        await GetDataLinkListAsync(token);
+                        break;
+                    case "Get Single DataLink Value":
+                        await GetSingleDataLinkValueAsync(token);
+                        break;
+                    case "Get Table by ID":
+                        await GetTableByIdAsync(token);
+                        break;
+                    case "Get Driver by ID":
+                        await GetDriverByIdAsync(token);
+                        break;
+                    case "Start Real-time Data Stream":
+                        await StreamRealtimeDataAsync(token);
+                        break;
+                }
             }
             catch (Exception ex)
             {
                 Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"Error during communication: {ex.Message}");
+                Console.WriteLine($"Operation failed: {ex.Message}");
                 Console.ResetColor();
             }
         }
     }
 
-    private static string? SelectPort()
+    private async Task GetEcuInfoAsync(CancellationToken token)
+    {
+        var info = await _ecuInteractionService.GetEcuInfoAsync(token);
+        if (info is not null)
+        {
+            Console.WriteLine($"  Product: {info.ProductName}");
+            Console.WriteLine($"  Model: {info.ModelName}");
+            Console.WriteLine($"  DEF Version: {info.DefVersion}");
+            Console.WriteLine($"  Firmware: {info.FirmwareVersion}");
+            Console.WriteLine($"  UUID: {info.Uuid}");
+            Console.WriteLine($"  Hash: {info.Hash}");
+        }
+        else
+        {
+            Console.WriteLine("  Could not retrieve ECU info.");
+        }
+    }
+
+    private async Task GetObjectListAsync(CancellationToken token)
+    {
+        var objects = await _ecuInteractionService.GetObjectListAsync(token);
+        Console.WriteLine($"  Found {objects.Count} objects:");
+        foreach (var obj in objects)
+        {
+            Console.WriteLine($"    ID: {obj.Id,-5} | Name: {obj.Name,-35} | Type: {obj.ObjectType}");
+        }
+    }
+
+    private async Task GetDataLinkListAsync(CancellationToken token)
+    {
+        var dataLinks = await _ecuInteractionService.GetDataLinkListAsync(token);
+        Console.WriteLine($"  Found {dataLinks.Count} datalinks:");
+        foreach (var link in dataLinks)
+        {
+            Console.WriteLine($"    ID: {link.Id,-5} | Name: {link.Name,-35}");
+        }
+    }
+    
+    private async Task GetSingleDataLinkValueAsync(CancellationToken token)
+    {
+        Console.Write("Enter DataLink ID to read: ");
+        if (ushort.TryParse(Console.ReadLine(), out var id))
+        {
+            var dataPoint = await _ecuInteractionService.GetRealtimeDataValueAsync(id, token);
+            if (dataPoint is not null)
+            {
+                Console.WriteLine($"  Value for {dataPoint.Name} (ID: {id}): {dataPoint.Value:F2}");
+            }
+            else
+            {
+                Console.WriteLine($"  Could not retrieve value for DataLink ID: {id}. It may not be in the reporting map.");
+            }
+        }
+        else
+        {
+            Console.WriteLine("  Invalid ID.");
+        }
+    }
+
+    private async Task GetTableByIdAsync(CancellationToken token)
+    {
+        Console.Write("Enter Table ID to read: ");
+        if (ushort.TryParse(Console.ReadLine(), out var id))
+        {
+            var table = await _ecuInteractionService.GetTableAsync(id, token);
+            if (table is not null)
+            {
+                Console.WriteLine($"  Table: {table.Name} (ID: {id})");
+                Console.WriteLine($"  X-Axis: [{string.Join(", ", table.XAxis)}]");
+                if(table.YAxis.Any()) Console.WriteLine($"  Y-Axis: [{string.Join(", ", table.YAxis)}]");
+                Console.WriteLine($"  Output: [{string.Join(", ", table.Output.Select(v => v.ToString("F2")))}]");
+            }
+            else
+            {
+                Console.WriteLine($"  Could not retrieve table with ID: {id}.");
+            }
+        }
+        else
+        {
+            Console.WriteLine("  Invalid ID.");
+        }
+    }
+    
+    private async Task GetDriverByIdAsync(CancellationToken token)
+    {
+        Console.Write("Enter Driver ID to read: ");
+        if (ushort.TryParse(Console.ReadLine(), out var id))
+        {
+            var driver = await _ecuInteractionService.GetDriverAsync(id, token);
+            if (driver is not null)
+            {
+                Console.WriteLine($"  Driver: {driver.Name} (ID: {id})");
+                Console.WriteLine($"  Config Params: [{string.Join(", ", driver.ConfigParams.Select(v => v.ToString("F2")))}]");
+                Console.WriteLine($"  Input Links: [{string.Join(", ", driver.InputLinkIds)}]");
+                Console.WriteLine($"  Output Links: [{string.Join(", ", driver.OutputLinkIds)}]");
+            }
+            else
+            {
+                Console.WriteLine($"  Could not retrieve driver with ID: {id}.");
+            }
+        }
+        else
+        {
+            Console.WriteLine("  Invalid ID.");
+        }
+    }
+
+    private async Task StreamRealtimeDataAsync(CancellationToken token)
+    {
+        Console.WriteLine("Starting real-time stream... Press Enter to stop.");
+        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(token);
+        
+        var keepAliveTask = Task.Run(async () =>
+        {
+            var ackMessage = new Message(0x0F, 0x00, 0x01, [0x00]);
+            while (!linkedCts.Token.IsCancellationRequested)
+            {
+                await Task.Delay(1000, linkedCts.Token);
+                await _communicator.PostMessageAsync(ackMessage, linkedCts.Token);
+            }
+        }, linkedCts.Token);
+
+        var streamTask = Task.Run(async () =>
+        {
+            await foreach (var dataPoints in _ecuInteractionService.StreamRealtimeDataAsync(linkedCts.Token))
+            {
+                Console.Clear();
+                Console.ForegroundColor = ConsoleColor.DarkGray;
+                Console.WriteLine("--- Real-time Data Stream (Press Enter to stop) ---");
+                foreach (var dp in dataPoints)
+                {
+                    Console.WriteLine($"  {dp.Name,-35} (ID: {dp.Id,-5}): {dp.Value,10:F2}");
+                }
+                Console.ResetColor();
+            }
+        }, linkedCts.Token);
+
+        await Task.WhenAny(streamTask, Console.In.ReadLineAsync(linkedCts.Token).AsTask());
+        await linkedCts.CancelAsync();
+        
+        Console.Clear();
+        Console.WriteLine("\nReal-time stream stopped.");
+    }
+    
+    private string? SelectPort()
     {
         var portNames = SerialPort.GetPortNames();
         if (portNames.Length == 0)
@@ -120,13 +292,13 @@ public class ConsoleEcuHost(
         }
 
         Console.WriteLine("\nAvailable serial ports:");
-        for (var i = 0; i < portNames.Length; i++)
+        for (int i = 0; i < portNames.Length; i++)
         {
             Console.WriteLine($"{i + 1}: {portNames[i]}");
         }
         
         Console.Write("Select a port: ");
-        if (int.TryParse(Console.ReadLine(), out var choice) && choice > 0 && choice <= portNames.Length)
+        if (int.TryParse(Console.ReadLine(), out int choice) && choice > 0 && choice <= portNames.Length)
         {
             return portNames[choice - 1];
         }
@@ -134,56 +306,24 @@ public class ConsoleEcuHost(
         Console.WriteLine("Invalid selection.");
         return null;
     }
-
+    
     private Operation? SelectOperation()
     {
-        while (true)
+        Console.WriteLine("\nAvailable operations:");
+        for (int i = 0; i < _operations.Count; i++)
         {
-            Console.WriteLine("\nAvailable operations:");
-            for (var i = 0; i < _operations.Count; i++)
-            {
-                Console.WriteLine($"{i + 1}: {_operations[i].Name} - {_operations[i].Description}");
-            }
-
-            Console.WriteLine("0: Exit");
-
-            Console.Write("Select an operation: ");
-            if (int.TryParse(Console.ReadLine(), out var choice) && choice >= 0 && choice <= _operations.Count)
-            {
-                return choice == 0 ? null : _operations[choice - 1];
-            }
-
-            Console.WriteLine("Invalid selection.");
+            Console.WriteLine($"{i + 1}: {_operations[i].Name}");
         }
-    }
+        Console.WriteLine("0: Exit");
 
-    private static async Task<byte[]> BuildPayload(Operation operation, CancellationToken token)
-    {
-        using var ms = new MemoryStream();
-        foreach (var param in operation.PayloadTemplate)
+        Console.Write("Select an operation: ");
+        if (int.TryParse(Console.ReadLine(), out int choice) && choice >= 0 && choice <= _operations.Count)
         {
-            while (!token.IsCancellationRequested)
-            {
-                var defaultValueHint = param.DefaultValue is not null ? $" (default: {param.DefaultValue})" : "";
-                Console.Write($"Enter value for '{param.Name}' ({param.Type}){defaultValueHint}: ");
-                var input = await Console.In.ReadLineAsync(token) ?? "";
-                
-                if (string.IsNullOrEmpty(input) && param.DefaultValue is not null)
-                {
-                    input = param.DefaultValue.ToString()!;
-                }
-
-                if (PayloadConverter.TryConvert(input, param.Type, out var bytes))
-                {
-                    ms.Write(bytes);
-                    break;
-                }
-                
-                Console.ForegroundColor = ConsoleColor.Yellow;
-                Console.WriteLine($"Invalid input. Please enter a valid '{param.Type}'.");
-                Console.ResetColor();
-            }
+            if (choice == 0) return null;
+            return _operations[choice - 1];
         }
-        return ms.ToArray();
+
+        Console.WriteLine("Invalid selection.");
+        return SelectOperation();
     }
 }
