@@ -1,4 +1,5 @@
-﻿using ME221CrossApp.Models;
+﻿// File: C:\Users\Administrator\RiderProjects\Me221CrossApp\ME221CrossApp.Services\EcuInteractionService.cs
+using ME221CrossApp.Models;
 using ME221CrossApp.Services.Helpers;
 using System.Runtime.CompilerServices;
 
@@ -104,6 +105,54 @@ public class EcuInteractionService : IEcuInteractionService
             var disableRequest = new Message(0x00, 0x00, 0x02, [0]);
             await _communicator.PostMessageAsync(disableRequest, CancellationToken.None);
             await Task.Delay(100, CancellationToken.None);
+        }
+    }
+
+    public async Task UpdateTableAsync(TableData table, CancellationToken cancellationToken = default)
+    {
+        var payload = EcuDataBuilder.BuildSetTablePayload(table);
+        var request = new Message(0x00, 0x01, 0x00, payload);
+        var response = await _communicator.SendMessageAsync(request, TimeSpan.FromSeconds(5), cancellationToken);
+        
+        if (response.Payload.Length < 1 || response.Payload[0] != 0)
+        {
+            throw new InvalidOperationException("ECU rejected table update.");
+        }
+    }
+
+    public async Task StoreTableAsync(ushort tableId, CancellationToken cancellationToken = default)
+    {
+        var payload = BitConverter.GetBytes(tableId);
+        var request = new Message(0x00, 0x01, 0x06, payload);
+        var response = await _communicator.SendMessageAsync(request, TimeSpan.FromSeconds(5), cancellationToken);
+
+        if (response.Payload.Length < 1 || response.Payload[0] != 0)
+        {
+            throw new InvalidOperationException("ECU rejected store table command.");
+        }
+    }
+
+    public async Task UpdateDriverAsync(DriverData driver, CancellationToken cancellationToken = default)
+    {
+        var payload = EcuDataBuilder.BuildSetDriverPayload(driver);
+        var request = new Message(0x00, 0x02, 0x00, payload);
+        var response = await _communicator.SendMessageAsync(request, TimeSpan.FromSeconds(5), cancellationToken);
+        
+        if (response.Payload.Length < 1 || response.Payload[0] != 0)
+        {
+            throw new InvalidOperationException("ECU rejected driver update.");
+        }
+    }
+
+    public async Task StoreDriverAsync(ushort driverId, CancellationToken cancellationToken = default)
+    {
+        var payload = BitConverter.GetBytes(driverId);
+        var request = new Message(0x00, 0x02, 0x02, payload);
+        var response = await _communicator.SendMessageAsync(request, TimeSpan.FromSeconds(5), cancellationToken);
+
+        if (response.Payload.Length < 1 || response.Payload[0] != 0)
+        {
+            throw new InvalidOperationException("ECU rejected store driver command.");
         }
     }
 }

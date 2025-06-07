@@ -26,5 +26,21 @@
   {
     "Name": "Start Real-time Data Stream",
     "Description": "Starts a continuous stream of all DataLink values."
+  },
+  {
+    "Name": "Update Table by ID",
+    "Description": "Updates a full data table on the ECU."
+  },
+  {
+    "Name": "Store Table by ID",
+    "Description": "Saves a table to the ECU's non-volatile memory."
+  },
+  {
+    "Name": "Update Driver by ID",
+    "Description": "Updates a full driver configuration on the ECU."
+  },
+  {
+    "Name": "Store Driver by ID",
+    "Description": "Saves a driver to the ECU's non-volatile memory."
   }
 ]

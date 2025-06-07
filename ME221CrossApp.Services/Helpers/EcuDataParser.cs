@@ -1,4 +1,5 @@
-﻿using ME221CrossApp.Models;
+﻿// File: C:\Users\Administrator\RiderProjects\Me221CrossApp\ME221CrossApp.Services\Helpers\EcuDataParser.cs
+using ME221CrossApp.Models;
 
 namespace ME221CrossApp.Services.Helpers;
 
@@ -128,7 +129,7 @@ public static class EcuDataParser
         }
         
         string name = definitionService.TryGetObject(id, out var def) && def is not null ? def.Name : $"Table_{id}";
-        return new TableData(id, name, xAxis, yAxis, output);
+        return new TableData(id, name, tableType, enabled, rows, cols, xAxis, yAxis, output);
     }
 
     public static DriverData? ParseDriverData(byte[] payload, IEcuDefinitionService definitionService)

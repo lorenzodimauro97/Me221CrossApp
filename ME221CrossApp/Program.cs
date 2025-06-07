@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Hosting;
+﻿// File: C:\Users\Administrator\RiderProjects\Me221CrossApp\ME221CrossApp\Program.cs
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Configuration;
 using System.IO.Ports;
@@ -126,6 +127,18 @@ public class ConsoleEcuHost : IHostedService
                         break;
                     case "Start Real-time Data Stream":
                         await StreamRealtimeDataAsync(token);
+                        break;
+                    case "Update Table by ID":
+                        await UpdateTableByIdAsync(token);
+                        break;
+                    case "Store Table by ID":
+                        await StoreTableByIdAsync(token);
+                        break;
+                    case "Update Driver by ID":
+                        await UpdateDriverByIdAsync(token);
+                        break;
+                    case "Store Driver by ID":
+                        await StoreDriverByIdAsync(token);
                         break;
                 }
             }
@@ -280,6 +293,127 @@ public class ConsoleEcuHost : IHostedService
         
         Console.Clear();
         Console.WriteLine("\nReal-time stream stopped.");
+    }
+    
+    private async Task UpdateTableByIdAsync(CancellationToken token)
+    {
+        Console.Write("Enter Table ID to update: ");
+        if (!ushort.TryParse(Console.ReadLine(), out var id))
+        {
+            Console.WriteLine("  Invalid ID.");
+            return;
+        }
+
+        var table = await _ecuInteractionService.GetTableAsync(id, token);
+        if (table is null)
+        {
+            Console.WriteLine($"  Could not retrieve table with ID: {id}.");
+            return;
+        }
+
+        if (table.Rows > 1)
+        {
+            Console.WriteLine("  2D table updates are not yet implemented in this tool.");
+            return;
+        }
+
+        Console.WriteLine($"  Updating 1D table: {table.Name}");
+        Console.WriteLine($"  X-Axis: [{string.Join(", ", table.XAxis)}]");
+        Console.Write("  Enter X-Axis value to modify: ");
+        if (!float.TryParse(Console.ReadLine(), out var xAxisValue))
+        {
+            Console.WriteLine("  Invalid X-Axis value.");
+            return;
+        }
+
+        var index = table.XAxis.ToList().IndexOf(xAxisValue);
+        if (index == -1)
+        {
+            Console.WriteLine($"  X-Axis value '{xAxisValue}' not found in table.");
+            return;
+        }
+
+        Console.WriteLine($"  Current output for X={xAxisValue} is {table.Output[index]:F2}");
+        Console.Write("  Enter new output value: ");
+        if (!float.TryParse(Console.ReadLine(), out var newOutputValue))
+        {
+            Console.WriteLine("  Invalid output value.");
+            return;
+        }
+
+        var mutableOutput = table.Output.ToList();
+        mutableOutput[index] = newOutputValue;
+        var updatedTable = table with { Output = mutableOutput };
+        
+        await _ecuInteractionService.UpdateTableAsync(updatedTable, token);
+        Console.WriteLine("  Table updated successfully.");
+    }
+
+    private async Task StoreTableByIdAsync(CancellationToken token)
+    {
+        Console.Write("Enter Table ID to store: ");
+        if (ushort.TryParse(Console.ReadLine(), out var id))
+        {
+            await _ecuInteractionService.StoreTableAsync(id, token);
+            Console.WriteLine($"  Store command for table ID {id} sent successfully.");
+        }
+        else
+        {
+            Console.WriteLine("  Invalid ID.");
+        }
+    }
+
+    private async Task UpdateDriverByIdAsync(CancellationToken token)
+    {
+        Console.Write("Enter Driver ID to update: ");
+        if (ushort.TryParse(Console.ReadLine(), out var id))
+        {
+            var driver = await _ecuInteractionService.GetDriverAsync(id, token);
+            if (driver is not null && driver.ConfigParams.Any())
+            {
+                Console.WriteLine($"  Current first config param for {driver.Name}: {driver.ConfigParams[0]:F2}");
+                Console.Write("  Enter new first config param value: ");
+                if (float.TryParse(Console.ReadLine(), out var newValue))
+                {
+                    var mutableParams = driver.ConfigParams.ToList();
+                    mutableParams[0] = newValue;
+                    var updatedDriver = driver with { ConfigParams = mutableParams };
+                    
+                    await _ecuInteractionService.UpdateDriverAsync(updatedDriver, token);
+                    Console.WriteLine("  Driver updated successfully.");
+                }
+                else
+                {
+                    Console.WriteLine("  Invalid value.");
+                }
+            }
+            else if (driver is not null)
+            {
+                Console.WriteLine($"  Driver {driver.Name} has no config params to update.");
+            }
+            else
+            {
+                Console.WriteLine($"  Could not retrieve driver with ID: {id}.");
+            }
+        }
+        else
+        {
+            Console.WriteLine("  Invalid ID.");
+        }
+    }
+
+    private async Task StoreDriverByIdAsync(CancellationToken token)
+    {
+        Console.Write("Enter Driver ID to store: ");
+        if (ushort.TryParse(Console.ReadLine(), out var id))
+        {
+            await _ecuInteractionService.StoreDriverAsync(id, token);
+            Console.WriteLine($"  Store command for driver ID {id} sent successfully.");
+        }
+        else
+        {
+            Console.WriteLine("  Invalid ID.");
+        }
     }
     
     private string? SelectPort()
