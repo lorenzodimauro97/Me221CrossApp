@@ -7,7 +7,13 @@ namespace ME221CrossApp.Services;
 public class EcuDefinitionService : IEcuDefinitionService
 {
     private EcuDefinition? _definition;
-    private const string DefinitionStorePath = "ecu_definitions.json";
+    private readonly string _definitionStorePath;
+
+    public EcuDefinitionService()
+    {
+        var appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+        _definitionStorePath = Path.Combine(appDataPath, "ecu_definitions.json");
+    }
 
     public EcuDefinition? GetDefinition() => _definition;
 
@@ -19,13 +25,13 @@ public class EcuDefinitionService : IEcuDefinitionService
     
     public async Task LoadFromStoreAsync(CancellationToken cancellationToken = default)
     {
-        if (!File.Exists(DefinitionStorePath))
+        if (!File.Exists(_definitionStorePath))
         {
             _definition = new EcuDefinition("Store", "Not Initialized", "0", new Dictionary<ushort, EcuObjectDefinition>());
             return;
         }
 
-        await using var storeStream = new FileStream(DefinitionStorePath, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, useAsync: true);
+        await using var storeStream = new FileStream(_definitionStorePath, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, useAsync: true);
         var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
         var objects = await JsonSerializer.DeserializeAsync<Dictionary<ushort, EcuObjectDefinition>>(storeStream, options, cancellationToken);
 
@@ -37,9 +43,9 @@ public class EcuDefinitionService : IEcuDefinitionService
         Dictionary<ushort, EcuObjectDefinition> objects;
         var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
 
-        if (File.Exists(DefinitionStorePath))
+        if (File.Exists(_definitionStorePath))
         {
-            await using var readStream = new FileStream(DefinitionStorePath, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, useAsync: true);
+            await using var readStream = new FileStream(_definitionStorePath, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, useAsync: true);
             objects = await JsonSerializer.DeserializeAsync<Dictionary<ushort, EcuObjectDefinition>>(readStream, options, cancellationToken)
                       ?? new Dictionary<ushort, EcuObjectDefinition>();
         }
@@ -110,7 +116,7 @@ public class EcuDefinitionService : IEcuDefinitionService
         
         _definition = new EcuDefinition(productName, modelName, version, objects);
         
-        await using var writeStream = new FileStream(DefinitionStorePath, FileMode.Create, FileAccess.Write, FileShare.None, 4096, useAsync: true);
+        await using var writeStream = new FileStream(_definitionStorePath, FileMode.Create, FileAccess.Write, FileShare.None, 4096, useAsync: true);
         await JsonSerializer.SerializeAsync(writeStream, objects, new JsonSerializerOptions { WriteIndented = true }, cancellationToken);
     }
 }

@@ -1,7 +1,7 @@
 ﻿using ObjCRuntime;
 using UIKit;
 
-namespace ME221CrossApp.MAUI
+namespace ME221CrossApp.MAUI.Platforms.iOS
 {
     public class Program
     {

@@ -1,0 +1,10 @@
+﻿<div class="data-point-card">
+    <div class="card-name">@DataPoint.Name</div>
+    <div class="card-value">@DataPoint.Value.ToString("F2")</div>
+    <div class="card-id">ID: @DataPoint.Id</div>
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public ME221CrossApp.Models.RealtimeDataPoint DataPoint { get; set; } = default!;
+}

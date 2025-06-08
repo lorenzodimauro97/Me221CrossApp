@@ -1,13 +1,14 @@
 ﻿using ME221CrossApp.Models;
 using ME221CrossApp.Services;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace ME221CrossApp.MAUI.Services;
 
-public sealed class HybridDeviceCommunicator(IServiceProvider serviceProvider, ConnectionState connectionState) : IDeviceCommunicator
+public sealed class HybridDeviceCommunicator(
+    ConnectionState connectionState,
+    ISerialPortCommunicator serialCommunicator,
+    ITcpPortCommunicator tcpCommunicator) : IDeviceCommunicator
 {
     private IDeviceCommunicator? _activeCommunicator;
-    private ConnectionMode? _activeMode;
 
     public bool IsConnected => _activeCommunicator?.IsConnected ?? false;
 
@@ -18,18 +19,13 @@ public sealed class HybridDeviceCommunicator(IServiceProvider serviceProvider, C
             throw new InvalidOperationException("Connection mode has not been selected.");
         }
 
-        if (_activeCommunicator is null || _activeMode != connectionState.Mode)
+        _activeCommunicator = connectionState.Mode switch
         {
-            _activeCommunicator?.DisposeAsync().AsTask().GetAwaiter().GetResult();
+            ConnectionMode.Serial => serialCommunicator,
+            ConnectionMode.Tcp => tcpCommunicator,
+            _ => throw new InvalidOperationException("Unsupported connection mode.")
+        };
 
-            _activeCommunicator = connectionState.Mode switch
-            {
-                ConnectionMode.Serial => serviceProvider.GetRequiredService<DeviceCommunicator>(),
-                ConnectionMode.Tcp => serviceProvider.GetRequiredService<TcpDeviceCommunicator>(),
-                _ => throw new InvalidOperationException("Unsupported connection mode.")
-            };
-            _activeMode = connectionState.Mode;
-        }
         return _activeCommunicator;
     }
 
@@ -56,12 +52,10 @@ public sealed class HybridDeviceCommunicator(IServiceProvider serviceProvider, C
         var communicator = GetActiveCommunicator();
         return communicator.GetIncomingMessages(cancellationToken);
     }
-    
+
     public async ValueTask DisposeAsync()
     {
-        if (_activeCommunicator is not null)
-        {
-            await _activeCommunicator.DisposeAsync();
-        }
+        await serialCommunicator.DisposeAsync();
+        await tcpCommunicator.DisposeAsync();
     }
 }

@@ -7,7 +7,7 @@ using ME221CrossApp.Services.Helpers;
 
 namespace ME221CrossApp.Services;
 
-public sealed class TcpDeviceCommunicator : IDeviceCommunicator
+public sealed class TcpDeviceCommunicator : ITcpPortCommunicator
 {
     private TcpClient? _tcpClient;
     private NetworkStream? _stream;
@@ -35,7 +35,7 @@ public sealed class TcpDeviceCommunicator : IDeviceCommunicator
         _cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         Task.Run(() => ReadLoopAsync(_cts.Token), _cts.Token);
     }
-    
+
     public async Task PostMessageAsync(Message request, CancellationToken cancellationToken = default)
     {
         if (_stream is null || !IsConnected || _cts is null)
@@ -57,7 +57,7 @@ public sealed class TcpDeviceCommunicator : IDeviceCommunicator
 
         var tcs = new TaskCompletionSource<Message>(TaskCreationOptions.RunContinuationsAsynchronously);
         var correlationId = (ushort)(request.Class << 8 | request.Command);
-        
+
         if (!_pendingCommands.TryAdd(correlationId, tcs))
         {
             throw new InvalidOperationException($"A command with Class '{request.Class}' and Command '{request.Command}' is already in flight.");
@@ -88,17 +88,17 @@ public sealed class TcpDeviceCommunicator : IDeviceCommunicator
     {
         return _incomingMessageChannel.Reader.ReadAllAsync(cancellationToken);
     }
-    
+
     private static byte[] BuildFrame(Message message)
     {
         var payloadLength = (ushort)message.Payload.Length;
         var messageContent = new byte[3 + payloadLength];
-        
+
         messageContent[0] = message.Type;
         messageContent[1] = message.Class;
         messageContent[2] = message.Command;
         message.Payload.CopyTo(messageContent, 3);
-        
+
         var crc = Fletcher16Checksum.Compute(messageContent);
 
         var finalFrame = new byte[2 + 2 + messageContent.Length + 2];
@@ -109,7 +109,7 @@ public sealed class TcpDeviceCommunicator : IDeviceCommunicator
         messageContent.CopyTo(finalFrame, 4);
         finalFrame[^2] = (byte)crc;
         finalFrame[^1] = (byte)(crc >> 8);
-        
+
         return finalFrame;
     }
 
@@ -126,7 +126,7 @@ public sealed class TcpDeviceCommunicator : IDeviceCommunicator
                 var sizeBytes = await ReadBytesAsync(_stream, 2, token);
                 var payloadSize = (ushort)(sizeBytes[0] | (sizeBytes[1] << 8));
                 var messageContentSize = 3 + payloadSize;
-                
+
                 if (messageContentSize >= 4096) continue;
 
                 var messageContent = await ReadBytesAsync(_stream, messageContentSize, token);
@@ -141,7 +141,7 @@ public sealed class TcpDeviceCommunicator : IDeviceCommunicator
                 {
                     Array.Copy(messageContent, 3, payload, 0, payloadSize);
                 }
-                
+
                 var message = new Message(messageContent[0], messageContent[1], messageContent[2], payload);
                 var correlationId = (ushort)(message.Class << 8 | message.Command);
                 if (_pendingCommands.TryRemove(correlationId, out var tcs))
@@ -170,7 +170,7 @@ public sealed class TcpDeviceCommunicator : IDeviceCommunicator
         if (bytesRead == 0) throw new EndOfStreamException();
         return buffer[0];
     }
-    
+
     private static async Task<byte[]> ReadBytesAsync(Stream stream, int count, CancellationToken token)
     {
         var buffer = new byte[count];
@@ -191,15 +191,15 @@ public sealed class TcpDeviceCommunicator : IDeviceCommunicator
             await _cts.CancelAsync();
             _cts.Dispose();
         }
-        
+
         _incomingMessageChannel.Writer.TryComplete();
-        
+
         foreach (var tcs in _pendingCommands.Values)
         {
             tcs.TrySetCanceled();
         }
         _pendingCommands.Clear();
-        
+
         _stream?.Dispose();
         _tcpClient?.Dispose();
         await ValueTask.CompletedTask;
