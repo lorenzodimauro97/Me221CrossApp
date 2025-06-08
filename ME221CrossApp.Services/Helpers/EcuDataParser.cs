@@ -1,5 +1,4 @@
-﻿// File: C:\Users\Administrator\RiderProjects\Me221CrossApp\ME221CrossApp.Services\Helpers\EcuDataParser.cs
-using ME221CrossApp.Models;
+﻿using ME221CrossApp.Models;
 
 namespace ME221CrossApp.Services.Helpers;
 

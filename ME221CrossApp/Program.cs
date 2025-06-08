@@ -1,9 +1,6 @@
-﻿// File: C:\Users\Administrator\RiderProjects\Me221CrossApp\ME221CrossApp\Program.cs
-using Microsoft.Extensions.Hosting;
+﻿using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Configuration;
-using System.IO.Ports;
-using System.Text;
 using System.Text.Json;
 using ME221CrossApp.Models;
 using ME221CrossApp.Services;
@@ -12,6 +9,7 @@ await Host.CreateDefaultBuilder(args)
     .ConfigureServices((hostContext, services) =>
     {
         services.AddSingleton<IDeviceCommunicator, DeviceCommunicator>();
+        services.AddSingleton<IDeviceDiscoveryService, DesktopDeviceDiscoveryService>();
         services.AddSingleton<IEcuDefinitionService, EcuDefinitionService>();
         services.AddSingleton<IEcuInteractionService, EcuInteractionService>();
         services.AddHostedService<ConsoleEcuHost>();
@@ -25,6 +23,7 @@ public class ConsoleEcuHost : IHostedService
     private readonly IDeviceCommunicator _communicator;
     private readonly IEcuDefinitionService _definitionService;
     private readonly IEcuInteractionService _ecuInteractionService;
+    private readonly IDeviceDiscoveryService _deviceDiscoveryService;
     private List<Operation> _operations = [];
 
     public ConsoleEcuHost(
@@ -32,13 +31,15 @@ public class ConsoleEcuHost : IHostedService
         IConfiguration config,
         IDeviceCommunicator communicator,
         IEcuDefinitionService definitionService,
-        IEcuInteractionService ecuInteractionService)
+        IEcuInteractionService ecuInteractionService,
+        IDeviceDiscoveryService deviceDiscoveryService)
     {
         _appLifetime = appLifetime;
         _config = config;
         _communicator = communicator;
         _definitionService = definitionService;
         _ecuInteractionService = ecuInteractionService;
+        _deviceDiscoveryService = deviceDiscoveryService;
     }
 
     public Task StartAsync(CancellationToken cancellationToken)
@@ -83,7 +84,7 @@ public class ConsoleEcuHost : IHostedService
 
         LoadOperations();
         
-        var portName = SelectPort();
+        var portName = await SelectPortAsync();
         if (string.IsNullOrEmpty(portName)) return;
 
         var baudRate = _config.GetValue<int>("BaudRate");
@@ -263,16 +264,6 @@ public class ConsoleEcuHost : IHostedService
         Console.WriteLine("Starting real-time stream... Press Enter to stop.");
         using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(token);
         
-        var keepAliveTask = Task.Run(async () =>
-        {
-            var ackMessage = new Message(0x0F, 0x00, 0x01, [0x00]);
-            while (!linkedCts.Token.IsCancellationRequested)
-            {
-                await Task.Delay(1000, linkedCts.Token);
-                await _communicator.PostMessageAsync(ackMessage, linkedCts.Token);
-            }
-        }, linkedCts.Token);
-
         var streamTask = Task.Run(async () =>
         {
             await foreach (var dataPoints in _ecuInteractionService.StreamRealtimeDataAsync(linkedCts.Token))
@@ -290,6 +281,14 @@ public class ConsoleEcuHost : IHostedService
 
         await Task.WhenAny(streamTask, Console.In.ReadLineAsync(linkedCts.Token).AsTask());
         await linkedCts.CancelAsync();
+        
+        try
+        {
+            await streamTask;
+        }
+        catch (OperationCanceledException)
+        {
+        }
         
         Console.Clear();
         Console.WriteLine("\nReal-time stream stopped.");
@@ -416,23 +415,23 @@ public class ConsoleEcuHost : IHostedService
         }
     }
     
-    private string? SelectPort()
+    private async Task<string?> SelectPortAsync()
     {
-        var portNames = SerialPort.GetPortNames();
-        if (portNames.Length == 0)
+        var portNames = await _deviceDiscoveryService.GetAvailablePortsAsync();
+        if (portNames.Count == 0)
         {
             Console.WriteLine("No serial ports found.");
             return null;
         }
 
         Console.WriteLine("\nAvailable serial ports:");
-        for (int i = 0; i < portNames.Length; i++)
+        for (int i = 0; i < portNames.Count; i++)
         {
             Console.WriteLine($"{i + 1}: {portNames[i]}");
         }
         
         Console.Write("Select a port: ");
-        if (int.TryParse(Console.ReadLine(), out int choice) && choice > 0 && choice <= portNames.Length)
+        if (int.TryParse(Console.ReadLine(), out int choice) && choice > 0 && choice <= portNames.Count)
         {
             return portNames[choice - 1];
         }

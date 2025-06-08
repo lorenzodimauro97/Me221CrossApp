@@ -1,5 +1,4 @@
-﻿// File: C:\Users\Administrator\RiderProjects\Me221CrossApp\ME221CrossApp.Services\EcuInteractionService.cs
-using ME221CrossApp.Models;
+﻿using ME221CrossApp.Models;
 using ME221CrossApp.Services.Helpers;
 using System.Runtime.CompilerServices;
 
@@ -38,7 +37,7 @@ public class EcuInteractionService : IEcuInteractionService
 
         var disableRequest = new Message(0x00, 0x00, 0x02, [0]);
         await _communicator.PostMessageAsync(disableRequest, cancellationToken);
-        await Task.Delay(100, cancellationToken); // Give ECU time to process disable command
+        await Task.Delay(100, cancellationToken);
 
         var dataLinks = new List<EcuObjectDefinition>();
         foreach (var (id, _) in reportingMap)
@@ -90,9 +89,27 @@ public class EcuInteractionService : IEcuInteractionService
             yield break;
         }
 
+        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+
+        var keepAliveTask = Task.Run(async () =>
+        {
+            var ackMessage = new Message(0x0F, 0x00, 0x01, [0x00]);
+            using var timer = new PeriodicTimer(TimeSpan.FromSeconds(1));
+            try
+            {
+                while (await timer.WaitForNextTickAsync(linkedCts.Token))
+                {
+                    await _communicator.PostMessageAsync(ackMessage, linkedCts.Token);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+            }
+        }, linkedCts.Token);
+
         try
         {
-            await foreach (var message in _communicator.GetIncomingMessages(cancellationToken))
+            await foreach (var message in _communicator.GetIncomingMessages(linkedCts.Token))
             {
                 if (message.Type == 0x0F && message.Class == 0x00 && message.Command == 0x00)
                 {
@@ -102,6 +119,13 @@ public class EcuInteractionService : IEcuInteractionService
         }
         finally
         {
+            await linkedCts.CancelAsync();
+            try
+            {
+                await keepAliveTask;
+            }
+            catch (OperationCanceledException) { }
+
             var disableRequest = new Message(0x00, 0x00, 0x02, [0]);
             await _communicator.PostMessageAsync(disableRequest, CancellationToken.None);
             await Task.Delay(100, CancellationToken.None);
