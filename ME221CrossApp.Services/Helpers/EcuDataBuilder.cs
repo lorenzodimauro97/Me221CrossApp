@@ -9,7 +9,7 @@ public static class EcuDataBuilder
         using var stream = new MemoryStream();
         using var writer = new BinaryWriter(stream);
 
-        byte[] serializedTable = BuildSerializedTable(table);
+        var serializedTable = BuildSerializedTable(table);
         
         writer.Write(table.Id);
         writer.Write((ushort)serializedTable.Length);
@@ -23,7 +23,7 @@ public static class EcuDataBuilder
         using var stream = new MemoryStream();
         using var writer = new BinaryWriter(stream);
 
-        byte[] serializedDriver = BuildSerializedDriver(driver);
+        var serializedDriver = BuildSerializedDriver(driver);
 
         writer.Write(driver.Id);
         writer.Write((ushort)serializedDriver.Length);

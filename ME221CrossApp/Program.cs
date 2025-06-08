@@ -5,11 +5,29 @@ using System.Text.Json;
 using ME221CrossApp.Models;
 using ME221CrossApp.Services;
 
+Console.WriteLine("--- .NET 9 ECU Communicator ---");
+Console.WriteLine("Select mode:");
+Console.WriteLine("  1. Real Device (Serial Port)");
+Console.WriteLine("  2. Simulator (TCP)");
+Console.Write("Enter choice [1]: ");
+var choice = Console.ReadLine();
+
 await Host.CreateDefaultBuilder(args)
     .ConfigureServices((hostContext, services) =>
     {
-        services.AddSingleton<IDeviceCommunicator, DeviceCommunicator>();
-        services.AddSingleton<IDeviceDiscoveryService, DesktopDeviceDiscoveryService>();
+        if (choice == "2")
+        {
+            Console.WriteLine("Simulator mode selected. Please ensure the ME221CrossApp.Simulator application is running.");
+            services.AddSingleton<IDeviceDiscoveryService, TcpDeviceDiscoveryService>();
+            services.AddSingleton<IDeviceCommunicator, TcpDeviceCommunicator>();
+        }
+        else
+        {
+            Console.WriteLine("Real Device mode selected.");
+            services.AddSingleton<IDeviceDiscoveryService, DesktopDeviceDiscoveryService>();
+            services.AddSingleton<IDeviceCommunicator, DeviceCommunicator>();
+        }
+
         services.AddSingleton<IEcuDefinitionService, EcuDefinitionService>();
         services.AddSingleton<IEcuInteractionService, EcuInteractionService>();
         services.AddHostedService<ConsoleEcuHost>();
@@ -77,28 +95,35 @@ public class ConsoleEcuHost : IHostedService
     
     private async Task RunMainLoop(CancellationToken token)
     {
-        Console.WriteLine("--- .NET 9 ECU Communicator ---");
         await _definitionService.LoadFromStoreAsync(token);
         var initialDef = _definitionService.GetDefinition();
         Console.WriteLine($"Loaded {initialDef?.EcuObjects.Count ?? 0} definitions from local store.");
 
         LoadOperations();
         
-        var portName = await SelectPortAsync();
-        if (string.IsNullOrEmpty(portName)) return;
-
-        var baudRate = _config.GetValue<int>("BaudRate");
-        Console.WriteLine($"Connecting to {portName} at {baudRate} baud...");
-
-        await _communicator.ConnectAsync(portName, baudRate, token);
-        Console.ForegroundColor = ConsoleColor.Green;
-        Console.WriteLine("Connection successful.");
-        Console.ResetColor();
-        
         while (!token.IsCancellationRequested)
         {
             var operation = SelectOperation();
             if (operation is null) break;
+
+            if (operation.Name == "Import Definitions from File")
+            {
+                 await ImportDefinitionsAsync(token);
+                 continue;
+            }
+            
+            if (!_communicator.IsConnected)
+            {
+                var portName = await SelectPortAsync();
+                if (string.IsNullOrEmpty(portName)) continue;
+
+                var baudRate = _config.GetValue<int>("BaudRate");
+                Console.WriteLine($"Connecting to {portName}...");
+                await _communicator.ConnectAsync(portName, baudRate, token);
+                Console.ForegroundColor = ConsoleColor.Green;
+                Console.WriteLine("Connection successful.");
+                Console.ResetColor();
+            }
 
             try
             {
@@ -149,6 +174,32 @@ public class ConsoleEcuHost : IHostedService
                 Console.WriteLine($"Operation failed: {ex.Message}");
                 Console.ResetColor();
             }
+        }
+    }
+
+    private async Task ImportDefinitionsAsync(CancellationToken token)
+    {
+        Console.Write("Enter path to ECU definition file: ");
+        var filePath = Console.ReadLine();
+        if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath))
+        {
+            Console.WriteLine("  Invalid file path.");
+            return;
+        }
+
+        try
+        {
+            await _definitionService.MergeDefinitionFileAsync(filePath, token);
+            Console.WriteLine("  Definitions imported and merged successfully.");
+            var newDef = _definitionService.GetDefinition();
+            Console.WriteLine($"  Store now contains {newDef?.EcuObjects.Count ?? 0} definitions.");
+            Console.WriteLine("  Please restart the application for changes to take full effect in all services.");
+        }
+        catch (Exception ex)
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine($"  Failed to import definitions: {ex.Message}");
+            Console.ResetColor();
         }
     }
 
@@ -420,17 +471,22 @@ public class ConsoleEcuHost : IHostedService
         var portNames = await _deviceDiscoveryService.GetAvailablePortsAsync();
         if (portNames.Count == 0)
         {
-            Console.WriteLine("No serial ports found.");
+            Console.WriteLine("No devices/ports found.");
             return null;
         }
 
-        Console.WriteLine("\nAvailable serial ports:");
+        if (portNames.Count == 1)
+        {
+            return portNames[0];
+        }
+
+        Console.WriteLine("\nAvailable devices/ports:");
         for (int i = 0; i < portNames.Count; i++)
         {
             Console.WriteLine($"{i + 1}: {portNames[i]}");
         }
         
-        Console.Write("Select a port: ");
+        Console.Write("Select a device/port: ");
         if (int.TryParse(Console.ReadLine(), out int choice) && choice > 0 && choice <= portNames.Count)
         {
             return portNames[choice - 1];

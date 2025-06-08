@@ -1,14 +1,16 @@
 ﻿using System.Collections.Concurrent;
-using System.IO.Ports;
+using System.Net;
+using System.Net.Sockets;
 using System.Threading.Channels;
 using ME221CrossApp.Models;
 using ME221CrossApp.Services.Helpers;
 
 namespace ME221CrossApp.Services;
 
-public sealed class DeviceCommunicator : IDeviceCommunicator
+public sealed class TcpDeviceCommunicator : IDeviceCommunicator
 {
-    private SerialPort? _serialPort;
+    private TcpClient? _tcpClient;
+    private NetworkStream? _stream;
     private CancellationTokenSource? _cts;
     private readonly ConcurrentDictionary<ushort, TaskCompletionSource<Message>> _pendingCommands = new();
     private readonly Channel<Message> _incomingMessageChannel = Channel.CreateUnbounded<Message>();
@@ -16,44 +18,44 @@ public sealed class DeviceCommunicator : IDeviceCommunicator
     private const byte SyncByte1 = (byte)'M';
     private const byte SyncByte2 = (byte)'E';
 
-    public bool IsConnected => _serialPort?.IsOpen ?? false;
+    public bool IsConnected => _tcpClient?.Connected ?? false;
 
-    public Task ConnectAsync(string portName, int baudRate, CancellationToken cancellationToken = default)
+    public async Task ConnectAsync(string portName, int baudRate, CancellationToken cancellationToken = default)
     {
-        _serialPort = new SerialPort(portName, baudRate)
+        var parts = portName.Split(':');
+        if (parts.Length != 2 || !IPAddress.TryParse(parts[0], out var ip) || !int.TryParse(parts[1], out var port))
         {
-            ReadTimeout = 500,
-            WriteTimeout = 500
-        };
-        _serialPort.Open();
+            throw new ArgumentException("Invalid endpoint format. Expected 'IP:Port'.", nameof(portName));
+        }
+
+        _tcpClient = new TcpClient();
+        await _tcpClient.ConnectAsync(ip, port, cancellationToken);
+        _stream = _tcpClient.GetStream();
 
         _cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         Task.Run(() => ReadLoopAsync(_cts.Token), _cts.Token);
-        
-        return Task.CompletedTask;
     }
     
     public async Task PostMessageAsync(Message request, CancellationToken cancellationToken = default)
     {
-        if (_serialPort is null || !_serialPort.IsOpen || _cts is null)
+        if (_stream is null || !IsConnected || _cts is null)
         {
             throw new InvalidOperationException("Device is not connected.");
         }
 
         using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(_cts.Token, cancellationToken);
         var frame = BuildFrame(request);
-        await _serialPort.BaseStream.WriteAsync(frame, linkedCts.Token);
+        await _stream.WriteAsync(frame, linkedCts.Token);
     }
 
     public async Task<Message> SendMessageAsync(Message request, TimeSpan timeout, CancellationToken cancellationToken = default)
     {
-        if (_serialPort is null || !_serialPort.IsOpen || _cts is null)
+        if (_stream is null || !IsConnected || _cts is null)
         {
             throw new InvalidOperationException("Device is not connected.");
         }
 
         var tcs = new TaskCompletionSource<Message>(TaskCreationOptions.RunContinuationsAsynchronously);
-        
         var correlationId = (ushort)(request.Class << 8 | request.Command);
         
         if (!_pendingCommands.TryAdd(correlationId, tcs))
@@ -65,7 +67,7 @@ public sealed class DeviceCommunicator : IDeviceCommunicator
         {
             using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(_cts.Token, cancellationToken);
             var frame = BuildFrame(request);
-            await _serialPort.BaseStream.WriteAsync(frame, linkedCts.Token);
+            await _stream.WriteAsync(frame, linkedCts.Token);
 
             var completedTask = await Task.WhenAny(tcs.Task, Task.Delay(timeout, linkedCts.Token));
 
@@ -102,12 +104,9 @@ public sealed class DeviceCommunicator : IDeviceCommunicator
         var finalFrame = new byte[2 + 2 + messageContent.Length + 2];
         finalFrame[0] = SyncByte1;
         finalFrame[1] = SyncByte2;
-        
         finalFrame[2] = (byte)payloadLength;
         finalFrame[3] = (byte)(payloadLength >> 8);
-        
         messageContent.CopyTo(finalFrame, 4);
-        
         finalFrame[^2] = (byte)crc;
         finalFrame[^1] = (byte)(crc >> 8);
         
@@ -116,35 +115,34 @@ public sealed class DeviceCommunicator : IDeviceCommunicator
 
     private async Task ReadLoopAsync(CancellationToken token)
     {
-        if (_serialPort is null) return;
-        var stream = _serialPort.BaseStream;
+        if (_stream is null) return;
 
         while (!token.IsCancellationRequested)
         {
             try
             {
-                if (await ReadByteAsync(stream, token) != SyncByte1 ||
-                    await ReadByteAsync(stream, token) != SyncByte2) continue;
-                var sizeBytes = await ReadBytesAsync(stream, 2, token);
+                if (await ReadByteAsync(_stream, token) != SyncByte1 || await ReadByteAsync(_stream, token) != SyncByte2) continue;
+
+                var sizeBytes = await ReadBytesAsync(_stream, 2, token);
                 var payloadSize = (ushort)(sizeBytes[0] | (sizeBytes[1] << 8));
                 var messageContentSize = 3 + payloadSize;
-
+                
                 if (messageContentSize >= 4096) continue;
-                var messageContent = await ReadBytesAsync(stream, messageContentSize, token);
-                var crcBytes = await ReadBytesAsync(stream, 2, token);
+
+                var messageContent = await ReadBytesAsync(_stream, messageContentSize, token);
+                var crcBytes = await ReadBytesAsync(_stream, 2, token);
                 var receivedCrc = (ushort)(crcBytes[0] | (crcBytes[1] << 8));
-                        
                 var expectedCrc = Fletcher16Checksum.Compute(messageContent);
 
                 if (receivedCrc != expectedCrc) continue;
+
                 var payload = new byte[payloadSize];
                 if (payloadSize > 0)
                 {
                     Array.Copy(messageContent, 3, payload, 0, payloadSize);
                 }
-                            
+                
                 var message = new Message(messageContent[0], messageContent[1], messageContent[2], payload);
-                            
                 var correlationId = (ushort)(message.Class << 8 | message.Command);
                 if (_pendingCommands.TryRemove(correlationId, out var tcs))
                 {
@@ -155,13 +153,11 @@ public sealed class DeviceCommunicator : IDeviceCommunicator
                     await _incomingMessageChannel.Writer.WriteAsync(message, token);
                 }
             }
-            catch (OperationCanceledException)
-            {
-                break;
-            }
+            catch (OperationCanceledException) { break; }
+            catch (IOException) { break; }
             catch (Exception ex)
             {
-                Console.WriteLine($"Something terrible happened in DeviceCommunicator. {ex}");
+                Console.WriteLine($"Error in TCP communicator: {ex.Message}");
                 await Task.Delay(100, token);
             }
         }
@@ -178,7 +174,7 @@ public sealed class DeviceCommunicator : IDeviceCommunicator
     private static async Task<byte[]> ReadBytesAsync(Stream stream, int count, CancellationToken token)
     {
         var buffer = new byte[count];
-        var offset = 0;
+        int offset = 0;
         while (offset < count)
         {
             var bytesRead = await stream.ReadAsync(buffer.AsMemory(offset, count - offset), token);
@@ -204,14 +200,8 @@ public sealed class DeviceCommunicator : IDeviceCommunicator
         }
         _pendingCommands.Clear();
         
-        if (_serialPort != null)
-        {
-            if (_serialPort.IsOpen)
-            {
-                _serialPort.Close();
-            }
-            _serialPort.Dispose();
-        }
+        _stream?.Dispose();
+        _tcpClient?.Dispose();
         await ValueTask.CompletedTask;
     }
 }

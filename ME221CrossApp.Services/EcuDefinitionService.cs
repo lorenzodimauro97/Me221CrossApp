@@ -48,8 +48,18 @@ public class EcuDefinitionService : IEcuDefinitionService
             objects = new Dictionary<ushort, EcuObjectDefinition>();
         }
         
-        await using var stream = new FileStream(xmlFilePath, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, useAsync: true);
-        var doc = await XDocument.LoadAsync(stream, LoadOptions.None, cancellationToken);
+        var fileContent = await File.ReadAllTextAsync(xmlFilePath, cancellationToken);
+        var startIndex = fileContent.IndexOf("<ecu>", StringComparison.OrdinalIgnoreCase);
+        var endIndex = fileContent.LastIndexOf("</ecu>", StringComparison.OrdinalIgnoreCase);
+
+        if (startIndex == -1 || endIndex == -1)
+        {
+            throw new InvalidDataException("The file does not contain a valid <ecu>...</ecu> block.");
+        }
+
+        var xmlData = fileContent.Substring(startIndex, endIndex - startIndex + "</ecu>".Length);
+        using var stringReader = new StringReader(xmlData);
+        var doc = await XDocument.LoadAsync(stringReader, LoadOptions.None, cancellationToken);
 
         var infoElement = doc.Root?.Element("DeviceDataInformationModel");
         var productName = infoElement?.Element("ProductName")?.Value ?? "Unknown";

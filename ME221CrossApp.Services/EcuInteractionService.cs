@@ -4,45 +4,37 @@ using System.Runtime.CompilerServices;
 
 namespace ME221CrossApp.Services;
 
-public class EcuInteractionService : IEcuInteractionService
+public class EcuInteractionService(IDeviceCommunicator communicator, IEcuDefinitionService definitionService)
+    : IEcuInteractionService
 {
-    private readonly IDeviceCommunicator _communicator;
-    private readonly IEcuDefinitionService _definitionService;
-
-    public EcuInteractionService(IDeviceCommunicator communicator, IEcuDefinitionService definitionService)
-    {
-        _communicator = communicator;
-        _definitionService = definitionService;
-    }
-
     public async Task<EcuInfo?> GetEcuInfoAsync(CancellationToken cancellationToken = default)
     {
         var request = new Message(0x00, 0x04, 0x00, []);
-        var response = await _communicator.SendMessageAsync(request, TimeSpan.FromSeconds(2), cancellationToken);
+        var response = await communicator.SendMessageAsync(request, TimeSpan.FromSeconds(2), cancellationToken);
         return response.Payload.Length > 1 ? EcuDataParser.ParseEcuInfo(response.Payload) : null;
     }
 
     public async Task<IReadOnlyList<EcuObjectDefinition>> GetObjectListAsync(CancellationToken cancellationToken = default)
     {
         var request = new Message(0x00, 0x04, 0x01, [1]);
-        var response = await _communicator.SendMessageAsync(request, TimeSpan.FromSeconds(5), cancellationToken);
-        return EcuDataParser.ParseObjectList(response.Payload, _definitionService);
+        var response = await communicator.SendMessageAsync(request, TimeSpan.FromSeconds(5), cancellationToken);
+        return EcuDataParser.ParseObjectList(response.Payload, definitionService);
     }
 
     public async Task<IReadOnlyList<EcuObjectDefinition>> GetDataLinkListAsync(CancellationToken cancellationToken = default)
     {
         var enableRequest = new Message(0x00, 0x00, 0x02, [1]);
-        var response = await _communicator.SendMessageAsync(enableRequest, TimeSpan.FromSeconds(2), cancellationToken);
+        var response = await communicator.SendMessageAsync(enableRequest, TimeSpan.FromSeconds(2), cancellationToken);
         var reportingMap = EcuDataParser.ParseSetStateResponse(response.Payload);
 
         var disableRequest = new Message(0x00, 0x00, 0x02, [0]);
-        await _communicator.PostMessageAsync(disableRequest, cancellationToken);
+        await communicator.PostMessageAsync(disableRequest, cancellationToken);
         await Task.Delay(100, cancellationToken);
 
         var dataLinks = new List<EcuObjectDefinition>();
         foreach (var (id, _) in reportingMap)
         {
-            if (_definitionService.TryGetObject(id, out var def) && def is not null)
+            if (definitionService.TryGetObject(id, out var def) && def is not null)
             {
                 dataLinks.Add(def);
             }
@@ -66,22 +58,22 @@ public class EcuInteractionService : IEcuInteractionService
     {
         var payload = BitConverter.GetBytes(tableId);
         var request = new Message(0x00, 0x01, 0x01, payload);
-        var response = await _communicator.SendMessageAsync(request, TimeSpan.FromSeconds(5), cancellationToken);
-        return EcuDataParser.ParseTableData(response.Payload, _definitionService);
+        var response = await communicator.SendMessageAsync(request, TimeSpan.FromSeconds(5), cancellationToken);
+        return EcuDataParser.ParseTableData(response.Payload, definitionService);
     }
     
     public async Task<DriverData?> GetDriverAsync(ushort driverId, CancellationToken cancellationToken = default)
     {
         var payload = BitConverter.GetBytes(driverId);
         var request = new Message(0x00, 0x02, 0x01, payload);
-        var response = await _communicator.SendMessageAsync(request, TimeSpan.FromSeconds(5), cancellationToken);
-        return EcuDataParser.ParseDriverData(response.Payload, _definitionService);
+        var response = await communicator.SendMessageAsync(request, TimeSpan.FromSeconds(5), cancellationToken);
+        return EcuDataParser.ParseDriverData(response.Payload, definitionService);
     }
     
     public async IAsyncEnumerable<IReadOnlyList<RealtimeDataPoint>> StreamRealtimeDataAsync([EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         var enableRequest = new Message(0x00, 0x00, 0x02, [1]);
-        var enableResponse = await _communicator.SendMessageAsync(enableRequest, TimeSpan.FromSeconds(2), cancellationToken);
+        var enableResponse = await communicator.SendMessageAsync(enableRequest, TimeSpan.FromSeconds(2), cancellationToken);
         var reportingMap = EcuDataParser.ParseSetStateResponse(enableResponse.Payload);
 
         if (reportingMap.Count == 0)
@@ -99,7 +91,7 @@ public class EcuInteractionService : IEcuInteractionService
             {
                 while (await timer.WaitForNextTickAsync(linkedCts.Token))
                 {
-                    await _communicator.PostMessageAsync(ackMessage, linkedCts.Token);
+                    await communicator.PostMessageAsync(ackMessage, linkedCts.Token);
                 }
             }
             catch (OperationCanceledException)
@@ -109,11 +101,11 @@ public class EcuInteractionService : IEcuInteractionService
 
         try
         {
-            await foreach (var message in _communicator.GetIncomingMessages(linkedCts.Token))
+            await foreach (var message in communicator.GetIncomingMessages(linkedCts.Token))
             {
                 if (message.Type == 0x0F && message.Class == 0x00 && message.Command == 0x00)
                 {
-                    yield return EcuDataParser.ParseRealtimeData(message.Payload, reportingMap, _definitionService);
+                    yield return EcuDataParser.ParseRealtimeData(message.Payload, reportingMap, definitionService);
                 }
             }
         }
@@ -127,7 +119,7 @@ public class EcuInteractionService : IEcuInteractionService
             catch (OperationCanceledException) { }
 
             var disableRequest = new Message(0x00, 0x00, 0x02, [0]);
-            await _communicator.PostMessageAsync(disableRequest, CancellationToken.None);
+            await communicator.PostMessageAsync(disableRequest, CancellationToken.None);
             await Task.Delay(100, CancellationToken.None);
         }
     }
@@ -136,7 +128,7 @@ public class EcuInteractionService : IEcuInteractionService
     {
         var payload = EcuDataBuilder.BuildSetTablePayload(table);
         var request = new Message(0x00, 0x01, 0x00, payload);
-        var response = await _communicator.SendMessageAsync(request, TimeSpan.FromSeconds(5), cancellationToken);
+        var response = await communicator.SendMessageAsync(request, TimeSpan.FromSeconds(5), cancellationToken);
         
         if (response.Payload.Length < 1 || response.Payload[0] != 0)
         {
@@ -148,7 +140,7 @@ public class EcuInteractionService : IEcuInteractionService
     {
         var payload = BitConverter.GetBytes(tableId);
         var request = new Message(0x00, 0x01, 0x06, payload);
-        var response = await _communicator.SendMessageAsync(request, TimeSpan.FromSeconds(5), cancellationToken);
+        var response = await communicator.SendMessageAsync(request, TimeSpan.FromSeconds(5), cancellationToken);
 
         if (response.Payload.Length < 1 || response.Payload[0] != 0)
         {
@@ -160,7 +152,7 @@ public class EcuInteractionService : IEcuInteractionService
     {
         var payload = EcuDataBuilder.BuildSetDriverPayload(driver);
         var request = new Message(0x00, 0x02, 0x00, payload);
-        var response = await _communicator.SendMessageAsync(request, TimeSpan.FromSeconds(5), cancellationToken);
+        var response = await communicator.SendMessageAsync(request, TimeSpan.FromSeconds(5), cancellationToken);
         
         if (response.Payload.Length < 1 || response.Payload[0] != 0)
         {
@@ -172,7 +164,7 @@ public class EcuInteractionService : IEcuInteractionService
     {
         var payload = BitConverter.GetBytes(driverId);
         var request = new Message(0x00, 0x02, 0x02, payload);
-        var response = await _communicator.SendMessageAsync(request, TimeSpan.FromSeconds(5), cancellationToken);
+        var response = await communicator.SendMessageAsync(request, TimeSpan.FromSeconds(5), cancellationToken);
 
         if (response.Payload.Length < 1 || response.Payload[0] != 0)
         {

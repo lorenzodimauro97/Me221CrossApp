@@ -42,5 +42,9 @@
   {
     "Name": "Store Driver by ID",
     "Description": "Saves a driver to the ECU's non-volatile memory."
+  },
+  {
+    "Name": "Import Definitions from File",
+    "Description": "Parses an XML definition file and merges it into the local store."
   }
 ]

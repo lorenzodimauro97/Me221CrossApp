@@ -1,10 +1,19 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.14.36202.13
+MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ME221CrossApp", "ME221CrossApp\ME221CrossApp.csproj", "{B6C03339-A6E8-4479-84F5-5F91D71B4D92}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ME221CrossApp.Services", "ME221CrossApp.Services\ME221CrossApp.Services.csproj", "{7A39FCF3-865C-4E7C-A0F7-EAB91444A5D2}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ME221CrossApp.Models", "ME221CrossApp.Models\ME221CrossApp.Models.csproj", "{879920EB-9325-45E9-AF9B-9A6A99A1ACA6}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ME221CrossApp.EcuSimulator", "ME221CrossApp.EcuSimulator\ME221CrossApp.EcuSimulator.csproj", "{E1A1F0BD-616E-4F8E-A2E6-49FE5A1A0760}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ME221CrossApp.MAUI.Services", "ME221CrossApp.MAUI.Services\ME221CrossApp.MAUI.Services.csproj", "{860C05C4-0FD2-4973-815D-4761DE1467CB}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ME221CrossApp.MAUI", "ME221CrossApp.MAUI\ME221CrossApp.MAUI.csproj", "{0249BA70-1D04-42ED-9FF1-ECF08E0106F1}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -24,5 +33,24 @@ Global
 		{879920EB-9325-45E9-AF9B-9A6A99A1ACA6}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{879920EB-9325-45E9-AF9B-9A6A99A1ACA6}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{879920EB-9325-45E9-AF9B-9A6A99A1ACA6}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E1A1F0BD-616E-4F8E-A2E6-49FE5A1A0760}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E1A1F0BD-616E-4F8E-A2E6-49FE5A1A0760}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E1A1F0BD-616E-4F8E-A2E6-49FE5A1A0760}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E1A1F0BD-616E-4F8E-A2E6-49FE5A1A0760}.Release|Any CPU.Build.0 = Release|Any CPU
+		{860C05C4-0FD2-4973-815D-4761DE1467CB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{860C05C4-0FD2-4973-815D-4761DE1467CB}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{860C05C4-0FD2-4973-815D-4761DE1467CB}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{860C05C4-0FD2-4973-815D-4761DE1467CB}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0249BA70-1D04-42ED-9FF1-ECF08E0106F1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0249BA70-1D04-42ED-9FF1-ECF08E0106F1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0249BA70-1D04-42ED-9FF1-ECF08E0106F1}.Debug|Any CPU.Deploy.0 = Debug|Any CPU
+		{0249BA70-1D04-42ED-9FF1-ECF08E0106F1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0249BA70-1D04-42ED-9FF1-ECF08E0106F1}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {3D67E5B9-FF20-4B8E-A104-98C816FAB556}
 	EndGlobalSection
 EndGlobal
