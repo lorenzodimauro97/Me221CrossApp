@@ -1,5 +1,4 @@
-﻿// File: C:\Users\Administrator\RiderProjects\Me221CrossApp\ME221CrossApp.Services\IEcuInteractionService.cs
-using ME221CrossApp.Models;
+﻿using ME221CrossApp.Models;
 using System.Runtime.CompilerServices;
 
 namespace ME221CrossApp.Services;
