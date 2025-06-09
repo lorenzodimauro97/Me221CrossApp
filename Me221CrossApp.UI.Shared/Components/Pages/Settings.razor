@@ -1,0 +1,61 @@
+﻿@page "/settings"
+@using ME221CrossApp.Services
+@using Me221CrossApp.UI.Shared.Services
+@inject IFilePickerService FilePickerService
+@inject IEcuDefinitionService EcuDefinitionService
+
+<PageTitle>Settings</PageTitle>
+
+<h1>Settings</h1>
+
+<div class="card" style="max-width: 600px; background-color: #1e1e1e; color: white; padding: 1.5rem; border-radius: 8px;">
+    <h2>ECU Definitions</h2>
+    <p>Load ECU object definitions from a MEFW file.</p>
+    <button class="btn btn-primary" @onclick="LoadDefinitionFile">Import .mefw File</button>
+
+    @if (!string.IsNullOrEmpty(_feedbackMessage))
+    {
+        <p class="mt-3" style="color:@(_isError ? "#ff5252" : "#4caf50")">@_feedbackMessage</p>
+    }
+</div>
+
+
+@code {
+    private string? _feedbackMessage;
+    private bool _isError;
+
+    private async Task LoadDefinitionFile()
+    {
+        _feedbackMessage = null;
+        _isError = false;
+
+        try
+        {
+            var fileTypes = new Dictionary<string, string>
+            {
+                { "MEFW Files", "*.mefw" },
+                { "All Files", "*.*" }
+            };
+
+            var filePath = await FilePickerService.PickFileAsync("Select MEFW Definition File", fileTypes);
+
+            if (string.IsNullOrWhiteSpace(filePath))
+            {
+                _feedbackMessage = "File selection was canceled.";
+                _isError = true;
+                return;
+            }
+
+            await EcuDefinitionService.MergeDefinitionFileAsync(filePath);
+            var definition = EcuDefinitionService.GetDefinition();
+            
+            _feedbackMessage = $"Successfully imported definitions. Total objects: {definition?.EcuObjects.Count ?? 0}.";
+            _isError = false;
+        }
+        catch (Exception ex)
+        {
+            _feedbackMessage = $"Error: {ex.Message}";
+            _isError = true;
+        }
+    }
+}
