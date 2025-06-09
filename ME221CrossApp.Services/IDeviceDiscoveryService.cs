@@ -1,6 +1,8 @@
-﻿namespace ME221CrossApp.Services;
+﻿using ME221CrossApp.Models;
+
+namespace ME221CrossApp.Services;
 
 public interface IDeviceDiscoveryService
 {
-    Task<IReadOnlyList<string>> GetAvailablePortsAsync();
+    Task<IReadOnlyList<DiscoveredDevice>> GetAvailableDevicesAsync();
 }

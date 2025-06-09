@@ -1,11 +1,15 @@
 ﻿using System.IO.Ports;
+using ME221CrossApp.Models;
 
 namespace ME221CrossApp.Services;
 
 public class DesktopDeviceDiscoveryService : IDeviceDiscoveryService
 {
-    public Task<IReadOnlyList<string>> GetAvailablePortsAsync()
+    public Task<IReadOnlyList<DiscoveredDevice>> GetAvailableDevicesAsync()
     {
-        return Task.FromResult<IReadOnlyList<string>>(SerialPort.GetPortNames());
+        var devices = SerialPort.GetPortNames()
+            .Select(p => new DiscoveredDevice(p, p))
+            .ToList();
+        return Task.FromResult<IReadOnlyList<DiscoveredDevice>>(devices);
     }
 }

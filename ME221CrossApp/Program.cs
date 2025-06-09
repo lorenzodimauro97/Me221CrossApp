@@ -471,7 +471,7 @@ namespace ME221CrossApp
     
         private async Task<string?> SelectPortAsync()
         {
-            var portNames = await _deviceDiscoveryService.GetAvailablePortsAsync();
+            var portNames = await _deviceDiscoveryService.GetAvailableDevicesAsync();
             if (portNames.Count == 0)
             {
                 Console.WriteLine("No devices/ports found.");
@@ -480,7 +480,7 @@ namespace ME221CrossApp
 
             if (portNames.Count == 1)
             {
-                return portNames[0];
+                return portNames[0].Name;
             }
 
             Console.WriteLine("\nAvailable devices/ports:");
@@ -492,7 +492,7 @@ namespace ME221CrossApp
             Console.Write("Select a device/port: ");
             if (int.TryParse(Console.ReadLine(), out int choice) && choice > 0 && choice <= portNames.Count)
             {
-                return portNames[choice - 1];
+                return portNames[choice - 1].Name;
             }
         
             Console.WriteLine("Invalid selection.");
