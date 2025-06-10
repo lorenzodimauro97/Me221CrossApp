@@ -2,9 +2,10 @@
 using System.IO.Ports;
 using System.Threading.Channels;
 using ME221CrossApp.Models;
+using ME221CrossApp.Services;
 using ME221CrossApp.Services.Helpers;
 
-namespace ME221CrossApp.Services;
+namespace Me221CrossApp.UI.Services.Windows;
 
 public sealed class DeviceCommunicator : ISerialPortCommunicator
 {

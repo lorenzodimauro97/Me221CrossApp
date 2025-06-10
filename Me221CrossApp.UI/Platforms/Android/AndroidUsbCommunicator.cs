@@ -10,7 +10,7 @@ using Application = Android.App.Application;
 
 namespace Me221CrossApp.UI.Services;
 
-public sealed class AndroidUsbCommunicator : IDeviceCommunicator
+public sealed class AndroidUsbCommunicator : ISerialPortCommunicator
 {
     private UsbManager? _usbManager;
     private UsbDevice? _device;
@@ -43,7 +43,7 @@ public sealed class AndroidUsbCommunicator : IDeviceCommunicator
 
         if (!_usbManager.HasPermission(_device))
         {
-            var permissionGranted = await RequestPermissionAsync(_usbManager, _device);
+            var permissionGranted = await RequestPermissionAsync(_usbManager, _device, cancellationToken);
             if (!permissionGranted)
             {
                 throw new UnauthorizedAccessException("Permission denied for USB device.");
@@ -90,13 +90,38 @@ public sealed class AndroidUsbCommunicator : IDeviceCommunicator
         Task.Run(() => ReadLoopAsync(_cts.Token), _cts.Token);
     }
 
-    private static async Task<bool> RequestPermissionAsync(UsbManager manager, UsbDevice device)
+    private static Task<bool> RequestPermissionAsync(UsbManager manager, UsbDevice device, CancellationToken cancellationToken)
     {
-        UsbPermissionReceiver.PermissionTcs = new TaskCompletionSource<bool>();
-        var intent = new Intent(UsbConstants.ActionUsbPermission);
-        var pendingIntent = PendingIntent.GetBroadcast(Application.Context, 0, intent, PendingIntentFlags.UpdateCurrent | PendingIntentFlags.Immutable);
+        var context = MainActivity.Instance ?? Application.Context;
+        var receiver = new UsbPermissionReceiver();
+        var intentFilter = new IntentFilter(UsbConstants.ActionUsbPermission);
+
+        if (OperatingSystem.IsAndroidVersionAtLeast(33))
+        {
+            context.RegisterReceiver(receiver, intentFilter, ReceiverFlags.Exported);
+        }
+        else
+        {
+            context.RegisterReceiver(receiver, intentFilter);
+        }
+
+        cancellationToken.Register(() =>
+        {
+            receiver.PermissionTcs.TrySetCanceled(cancellationToken);
+            try
+            {
+                context.UnregisterReceiver(receiver);
+            }
+            catch (Java.Lang.IllegalArgumentException)
+            {
+                // Already unregistered, ignore.
+            }
+        });
+
+        var pendingIntent = PendingIntent.GetBroadcast(context, 0, new Intent(UsbConstants.ActionUsbPermission), PendingIntentFlags.UpdateCurrent | PendingIntentFlags.Immutable);
         manager.RequestPermission(device, pendingIntent);
-        return await UsbPermissionReceiver.PermissionTcs.Task;
+        
+        return receiver.PermissionTcs.Task;
     }
     
     public async Task PostMessageAsync(Message request, CancellationToken cancellationToken = default)

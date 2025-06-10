@@ -7,17 +7,13 @@
     </PropertyGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\ME221CrossApp.Models\ME221CrossApp.Models.csproj" />
+        <ProjectReference Include="..\ME221CrossApp.Models\ME221CrossApp.Models.csproj" />
     </ItemGroup>
 
     <ItemGroup>
-      <PackageReference Include="System.IO.Ports" Version="10.0.0-preview.5.25277.114" />
-    </ItemGroup>
-
-    <ItemGroup>
-      <None Update="operations.json">
-        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      </None>
+        <None Update="operations.json">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </None>
     </ItemGroup>
 
 </Project>

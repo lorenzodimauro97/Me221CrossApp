@@ -1,7 +1,8 @@
 ﻿using System.IO.Ports;
 using ME221CrossApp.Models;
+using ME221CrossApp.Services;
 
-namespace ME221CrossApp.Services;
+namespace Me221CrossApp.UI.Services.Windows;
 
 public class DesktopDeviceDiscoveryService : IDeviceDiscoveryService
 {
