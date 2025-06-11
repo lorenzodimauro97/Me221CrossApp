@@ -2,10 +2,11 @@
 using ME221CrossApp.EcuSimulator.Helpers;
 using ME221CrossApp.Models;
 using ME221CrossApp.Services.Helpers;
+using Microsoft.Extensions.Logging;
 
 namespace ME221CrossApp.EcuSimulator;
 
-public class ClientHandler(TcpClient client, ISimulatedEcuStateService stateService)
+public class ClientHandler(TcpClient client, ISimulatedEcuStateService stateService, ILogger<ClientHandler> logger)
 {
     private readonly CancellationTokenSource _cts = new();
     private bool _isReportingEnabled;
@@ -14,7 +15,7 @@ public class ClientHandler(TcpClient client, ISimulatedEcuStateService stateServ
 
     public async Task HandleClientAsync()
     {
-        Console.WriteLine($"Client connected: {client.Client.RemoteEndPoint}");
+        logger.LogInformation("Client connected from {RemoteEndPoint}", client.Client.RemoteEndPoint);
         var stream = client.GetStream();
 
         var readLoopTask = ReadLoopAsync(stream, _cts.Token);
@@ -23,7 +24,7 @@ public class ClientHandler(TcpClient client, ISimulatedEcuStateService stateServ
         await Task.WhenAny(readLoopTask, realtimeTask);
 
         await _cts.CancelAsync();
-        Console.WriteLine($"Client disconnected: {client.Client.RemoteEndPoint}");
+        logger.LogInformation("Client disconnected from {RemoteEndPoint}", client.Client.RemoteEndPoint);
         client.Close();
     }
 
@@ -48,7 +49,11 @@ public class ClientHandler(TcpClient client, ISimulatedEcuStateService stateServ
         {
             try
             {
-                if (await ReadByteAsync(stream, token) != SyncByte1 || await ReadByteAsync(stream, token) != SyncByte2) continue;
+                if (await ReadByteAsync(stream, token) != SyncByte1 || await ReadByteAsync(stream, token) != SyncByte2)
+                {
+                    logger.LogTrace("Sync bytes not found, continuing read loop.");
+                    continue;
+                }
 
                 var sizeBytes = await ReadBytesAsync(stream, 2, token);
                 var payloadSize = (ushort)(sizeBytes[0] | (sizeBytes[1] << 8));
@@ -61,7 +66,11 @@ public class ClientHandler(TcpClient client, ISimulatedEcuStateService stateServ
                 var receivedCrc = (ushort)(crcBytes[0] | (crcBytes[1] << 8));
                 var expectedCrc = Fletcher16Checksum.Compute(messageContent);
 
-                if (receivedCrc != expectedCrc) continue;
+                if (receivedCrc != expectedCrc)
+                {
+                    logger.LogWarning("Invalid CRC received. Expected {ExpectedCrc}, got {ReceivedCrc}. Frame dropped.", expectedCrc, receivedCrc);
+                    continue;
+                }
 
                 var payload = new byte[payloadSize];
                 if (payloadSize > 0)
@@ -82,7 +91,7 @@ public class ClientHandler(TcpClient client, ISimulatedEcuStateService stateServ
             catch (IOException) { break; }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error during client handling: {ex.Message}");
+                logger.LogError(ex, "Error during client handling for {RemoteEndPoint}", client.Client.RemoteEndPoint);
                 break;
             }
         }
@@ -128,12 +137,14 @@ public class ClientHandler(TcpClient client, ISimulatedEcuStateService stateServ
                 break;
             case { Class: 0x00, Command: 0x02 }:
                 _isReportingEnabled = request.Payload[0] == 1;
+                logger.LogInformation("Realtime reporting for {RemoteEndPoint} set to {IsEnabled}", client.Client.RemoteEndPoint, _isReportingEnabled);
                 responsePayload = SimulatorEcuPayloadBuilder.BuildSetStateResponsePayload(stateService.GetReportingMap());
                 break;
             case { Type: 0x0F, Class: 0x00, Command: 0x01 }:
                 responsePayload = [];
                 break;
             default:
+                logger.LogWarning("Unhandled request from {RemoteEndPoint}: Class={RequestClass}, Command={RequestCommand}", client.Client.RemoteEndPoint, request.Class, request.Command);
                 responsePayload = [0x01];
                 break;
         }

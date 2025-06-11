@@ -1,28 +1,29 @@
 ﻿using System.Collections.Concurrent;
 using ME221CrossApp.Models;
 using ME221CrossApp.Services;
+using Microsoft.Extensions.Logging;
 
 namespace ME221CrossApp.EcuSimulator;
 
-public class SimulatedEcuStateService : ISimulatedEcuStateService
+public class SimulatedEcuStateService(IEcuDefinitionService definitionService, ILogger<SimulatedEcuStateService> logger)
+    : ISimulatedEcuStateService
 {
-    private readonly IEcuDefinitionService _definitionService;
     private readonly ConcurrentDictionary<ushort, TableData> _tables = new();
     private readonly ConcurrentDictionary<ushort, DriverData> _drivers = new();
     private readonly ConcurrentDictionary<ushort, RealtimeDataPoint> _realtimeData = new();
     private readonly EcuInfo _ecuInfo = new("ME221-SIM", "PnP", "SIM-1.0", "SIM-FW-1.0", Guid.NewGuid().ToString(), "0000");
     private double _angle;
 
-    public SimulatedEcuStateService(IEcuDefinitionService definitionService)
-    {
-        _definitionService = definitionService;
-    }
-    
     public async Task InitializeAsync(CancellationToken cancellationToken = default)
     {
-        await _definitionService.LoadFromStoreAsync(cancellationToken);
-        var definition = _definitionService.GetDefinition();
-        if (definition is null) return;
+        logger.LogInformation("Initializing simulated ECU state...");
+        await definitionService.LoadFromStoreAsync(cancellationToken);
+        var definition = definitionService.GetDefinition();
+        if (definition is null)
+        {
+            logger.LogWarning("ECU definition is null during initialization.");
+            return;
+        }
 
         foreach (var ecuObject in definition.EcuObjects.Values)
         {
@@ -50,27 +51,27 @@ public class SimulatedEcuStateService : ISimulatedEcuStateService
                     break;
             }
         }
+        logger.LogInformation("Simulated ECU state initialized with {TableCount} tables, {DriverCount} drivers, and {DataLinkCount} data links.", _tables.Count, _drivers.Count, _realtimeData.Count);
     }
 
     public EcuInfo GetEcuInfo() => _ecuInfo;
 
     public IReadOnlyList<EcuObjectDefinition> GetObjectList()
     {
-        return _definitionService.GetDefinition()?.EcuObjects.Values
+        return definitionService.GetDefinition()?.EcuObjects.Values
             .Where(o => o.ObjectType is "Table" or "Driver")
             .ToList() ?? [];
     }
     
     public IReadOnlyList<EcuObjectDefinition> GetDataLinkList()
     {
-        return _definitionService.GetDefinition()?.EcuObjects.Values
+        return definitionService.GetDefinition()?.EcuObjects.Values
             .Where(o => o.ObjectType is "DataLink")
             .ToList() ?? [];
     }
 
     public IReadOnlyDictionary<ushort, (ushort Id, byte Type)> GetReportingMap()
     {
-        // Simulate a mix of data types for reporting
         return _realtimeData.Keys.ToDictionary(id => id, id => (id, (byte)(id % 6)));
     }
 
@@ -78,9 +79,17 @@ public class SimulatedEcuStateService : ISimulatedEcuStateService
 
     public DriverData? GetDriver(ushort id) => _drivers.GetValueOrDefault(id);
 
-    public void UpdateTable(TableData table) => _tables[table.Id] = table;
+    public void UpdateTable(TableData table)
+    {
+        logger.LogDebug("Updating table {TableId}", table.Id);
+        _tables[table.Id] = table;
+    }
 
-    public void UpdateDriver(DriverData driver) => _drivers[driver.Id] = driver;
+    public void UpdateDriver(DriverData driver)
+    {
+        logger.LogDebug("Updating driver {DriverId}", driver.Id);
+        _drivers[driver.Id] = driver;
+    }
 
     public IReadOnlyList<RealtimeDataPoint> GetAllRealtimeDataAndUpdate()
     {

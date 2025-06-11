@@ -1,12 +1,14 @@
 ﻿using System.Net;
 using System.Net.Sockets;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
 namespace ME221CrossApp.EcuSimulator;
 
-public class SimulatorHost(ISimulatedEcuStateService stateService) : IHostedService
+public class SimulatorHost(ISimulatedEcuStateService stateService, ILoggerFactory loggerFactory) : IHostedService
 {
     private TcpListener? _listener;
+    private readonly ILogger<SimulatorHost> _logger = loggerFactory.CreateLogger<SimulatorHost>();
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
@@ -14,15 +16,27 @@ public class SimulatorHost(ISimulatedEcuStateService stateService) : IHostedServ
         
         _listener = new TcpListener(IPAddress.Loopback, 54321);
         _listener.Start();
-        Console.WriteLine("ECU Simulator listening on 127.0.0.1:54321...");
+        _logger.LogInformation("ECU Simulator listening on 127.0.0.1:54321...");
 
         _ = Task.Run(async () =>
         {
             while (!cancellationToken.IsCancellationRequested)
             {
-                var client = await _listener.AcceptTcpClientAsync(cancellationToken);
-                var handler = new ClientHandler(client, stateService);
-                _ = handler.HandleClientAsync();
+                try
+                {
+                    var client = await _listener.AcceptTcpClientAsync(cancellationToken);
+                    _logger.LogInformation("Accepted new client from {RemoteEndPoint}", client.Client.RemoteEndPoint);
+                    var handler = new ClientHandler(client, stateService, loggerFactory.CreateLogger<ClientHandler>());
+                    _ = handler.HandleClientAsync();
+                }
+                catch (OperationCanceledException)
+                {
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error accepting new client.");
+                }
             }
         }, cancellationToken);
     }
