@@ -12,5 +12,7 @@ public record EcuObjectDefinition(
     ushort Id,
     string Name,
     string Category,
-    string ObjectType
+    string ObjectType,
+    byte? Rows,
+    byte? Cols
 );

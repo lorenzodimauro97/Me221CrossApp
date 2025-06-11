@@ -30,9 +30,9 @@ public class SimulatedEcuStateService(IEcuDefinitionService definitionService, I
             switch (ecuObject.ObjectType)
             {
                 case "Table":
-                    bool is3D = ecuObject.Id % 2 == 0;
-                    byte rows = is3D ? (byte)16 : (byte)1;
-                    const byte cols = 16;
+                    byte rows = ecuObject.Rows ?? 1;
+                    byte cols = ecuObject.Cols ?? 16;
+                    bool is3D = rows > 1;
                     
                     var xAxis = Enumerable.Range(0, cols).Select(i => i * 500f).ToArray();
                     var yAxis = is3D ? Enumerable.Range(0, rows).Select(i => i * 10f).ToArray() : [];

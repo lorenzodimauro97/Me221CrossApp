@@ -1,12 +1,13 @@
 ﻿using System.Net.Sockets;
 using ME221CrossApp.EcuSimulator.Helpers;
 using ME221CrossApp.Models;
+using ME221CrossApp.Services;
 using ME221CrossApp.Services.Helpers;
 using Microsoft.Extensions.Logging;
 
 namespace ME221CrossApp.EcuSimulator;
 
-public class ClientHandler(TcpClient client, ISimulatedEcuStateService stateService, ILogger<ClientHandler> logger)
+public class ClientHandler(TcpClient client, ISimulatedEcuStateService stateService, IEcuDefinitionService definitionService, ILogger<ClientHandler> logger)
 {
     private readonly CancellationTokenSource _cts = new();
     private bool _isReportingEnabled;
@@ -115,7 +116,7 @@ public class ClientHandler(TcpClient client, ISimulatedEcuStateService stateServ
                 responsePayload = table != null ? SimulatorEcuPayloadBuilder.BuildGetTableResponsePayload(table) : [0x01];
                 break;
             case { Class: 0x01, Command: 0x00 }:
-                var updatedTable = SimulatorEcuDataParser.ParseSetTablePayload(request.Payload, null!);
+                var updatedTable = SimulatorEcuDataParser.ParseSetTablePayload(request.Payload, definitionService);
                 if(updatedTable != null) stateService.UpdateTable(updatedTable);
                 responsePayload = [0x00];
                 break;
@@ -128,7 +129,7 @@ public class ClientHandler(TcpClient client, ISimulatedEcuStateService stateServ
                 responsePayload = driver != null ? SimulatorEcuPayloadBuilder.BuildGetDriverResponsePayload(driver) : [0x01];
                 break;
             case { Class: 0x02, Command: 0x00 }:
-                var updatedDriver = SimulatorEcuDataParser.ParseSetDriverPayload(request.Payload, null!);
+                var updatedDriver = SimulatorEcuDataParser.ParseSetDriverPayload(request.Payload, definitionService);
                 if (updatedDriver != null) stateService.UpdateDriver(updatedDriver);
                 responsePayload = [0x00];
                 break;

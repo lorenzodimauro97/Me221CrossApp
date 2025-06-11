@@ -1,6 +1,4 @@
-﻿// File: C:\Users\Administrator\RiderProjects\Me221CrossApp\ME221CrossApp.Services\EcuDefinitionService.cs
-//--------------------------------------------------
-using System.Text.Json;
+﻿using System.Text.Json;
 using System.Xml.Linq;
 using ME221CrossApp.Models;
 using Microsoft.Extensions.Logging;
@@ -97,7 +95,9 @@ public class EcuDefinitionService : IEcuDefinitionService
                         Id: id,
                         Name: element.Element("name")?.Value ?? $"Unnamed Link {id}",
                         Category: element.Element("category")?.Value ?? "Uncategorized",
-                        ObjectType: "DataLink"
+                        ObjectType: "DataLink",
+                        Rows: null,
+                        Cols: null
                     );
                 }
             }
@@ -111,7 +111,9 @@ public class EcuDefinitionService : IEcuDefinitionService
                         Id: id,
                         Name: element.Element("name")?.Value ?? $"Unnamed Driver {id}",
                         Category: element.Element("category")?.Value ?? "Uncategorized",
-                        ObjectType: "Driver"
+                        ObjectType: "Driver",
+                        Rows: null,
+                        Cols: null
                     );
                 }
             }
@@ -121,11 +123,19 @@ public class EcuDefinitionService : IEcuDefinitionService
             {
                 if (ushort.TryParse(element.Element("id")?.Value, out var id))
                 {
+                    byte? rows = null;
+                    if (byte.TryParse(element.Element("rows")?.Value, out var r)) rows = r;
+
+                    byte? cols = null;
+                    if (byte.TryParse(element.Element("cols")?.Value, out var c)) cols = c;
+
                     objects[id] = new EcuObjectDefinition(
                         Id: id,
                         Name: element.Element("name")?.Value ?? $"Unnamed Table {id}",
                         Category: element.Element("category")?.Value ?? "Uncategorized",
-                        ObjectType: "Table"
+                        ObjectType: "Table",
+                        Rows: rows,
+                        Cols: cols
                     );
                 }
             }

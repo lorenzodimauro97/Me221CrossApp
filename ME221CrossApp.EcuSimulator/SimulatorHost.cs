@@ -1,11 +1,12 @@
 ﻿using System.Net;
 using System.Net.Sockets;
+using ME221CrossApp.Services;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 namespace ME221CrossApp.EcuSimulator;
 
-public class SimulatorHost(ISimulatedEcuStateService stateService, ILoggerFactory loggerFactory) : IHostedService
+public class SimulatorHost(ISimulatedEcuStateService stateService, IEcuDefinitionService definitionService, ILoggerFactory loggerFactory) : IHostedService
 {
     private TcpListener? _listener;
     private readonly ILogger<SimulatorHost> _logger = loggerFactory.CreateLogger<SimulatorHost>();
@@ -26,7 +27,7 @@ public class SimulatorHost(ISimulatedEcuStateService stateService, ILoggerFactor
                 {
                     var client = await _listener.AcceptTcpClientAsync(cancellationToken);
                     _logger.LogInformation("Accepted new client from {RemoteEndPoint}", client.Client.RemoteEndPoint);
-                    var handler = new ClientHandler(client, stateService, loggerFactory.CreateLogger<ClientHandler>());
+                    var handler = new ClientHandler(client, stateService, definitionService, loggerFactory.CreateLogger<ClientHandler>());
                     _ = handler.HandleClientAsync();
                 }
                 catch (OperationCanceledException)
