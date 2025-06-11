@@ -1,3 +1,7 @@
+# ME221CrossApp
+
+A modern, cross-platform .NET 10 application for interacting with ME221/ME442 Engine Control Units (ECUs). This solution provides a rich user interface for real-time monitoring, tuning, and configuration, alongside a powerful backend and a simulator for offline development.
+
 ## Table of Contents
 
 - [Technology Stack](#technology-stack)
@@ -16,8 +20,7 @@
 
 This project is built on the cutting edge of the .NET ecosystem, prioritizing performance, maintainability, and a modern development experience.
 
-- **.NET 9**: The underlying framework for all projects.
-- **C# 13**: Leveraging the latest language features.
+- **.NET 10**: The underlying framework for all projects.
 - **.NET MAUI**: For the cross-platform user interface, targeting Windows, Android, iOS, and macOS from a single codebase.
 - **Blazor Hybrid**: Powers the user interface, allowing for web UI technologies within a native MAUI application shell.
 - **Serilog**: For structured and configurable logging across all applications.
@@ -37,20 +40,20 @@ This project is built on the cutting edge of the .NET ecosystem, prioritizing pe
 
 The solution is logically divided into several projects:
 
-| Project                       | Description                                                                                                                             |
-| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| `ME221CrossApp.UI`              | The main .NET MAUI Blazor Hybrid application. This is the primary user-facing client.                                                   |
-| `ME221CrossApp.Services`        | A shared class library containing services for ECU interaction, definition management, and communication protocols.                     |
-| `ME221CrossApp.Models`          | Contains the shared data models (records) used across the entire solution, ensuring type safety and consistency.                        |
-| `ME221CrossApp.EcuSimulator`    | A .NET 9 console application that simulates an ME221 ECU, listening for TCP connections and responding to protocol messages.            |
-| `ME221CrossApp`                 | A .NET 9 console application demonstrating the use of the service layer for command-line based ECU interaction.                         |
+| Project                       | Description                                                                                                                   |
+| ----------------------------- |-------------------------------------------------------------------------------------------------------------------------------|
+| `ME221CrossApp.UI`              | The main .NET MAUI Blazor Hybrid application. This is the primary user-facing client.                                         |
+| `ME221CrossApp.Services`        | A shared class library containing services for ECU interaction, definition management, and communication protocols.           |
+| `ME221CrossApp.Models`          | Contains the shared data models (records) used across the entire solution, ensuring type safety and consistency.              |
+| `ME221CrossApp.EcuSimulator`    | A .NET 10 console application that simulates an ME221 ECU, listening for TCP connections and responding to protocol messages. |
+| `ME221CrossApp`                 | A .NET 10 console application demonstrating the use of the service layer for command-line based ECU interaction.              |
 
 ## Getting Started
 
 ### Prerequisites
 
-1.  **.NET 9 SDK**: Ensure you have the latest .NET 9 SDK installed.
-2.  **.NET MAUI Workload**: Install the MAUI workload for .NET 9:
+1.  **.NET 10 SDK**: Ensure you have the latest .NET 10 SDK installed.
+2.  **.NET MAUI Workload**: Install the MAUI workload for .NET 10:
     ```bash
     dotnet workload install maui
     ```
@@ -85,7 +88,7 @@ With the solution open in your IDE, set `ME221CrossApp.UI` as the startup projec
 Alternatively, you can run the application for a specific platform via the command line. For example, to run on Windows (adjust TFM if necessary):
 
 ```bash
-dotnet build -t:Run -f net9.0-windows10.0.19041.0 --project ME221CrossApp.UI
+dotnet build -t:Run -f net10.0-windows10.0.19041.0 --project ME221CrossApp.UI
 ```
 
 ## Usage Workflow
