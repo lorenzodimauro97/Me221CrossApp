@@ -1,0 +1,37 @@
+﻿<div class="ui-card">
+    <div class="ui-card-header">
+        Connected to @EcuInfo?.ProductName on Firmware @EcuInfo?.FirmwareVersion
+    </div>
+    <div class="ui-card-body">
+        @if (RealtimeData.Any())
+        {
+            <div class="data-grid-container">
+                @foreach (var dataPoint in RealtimeData.OrderBy(d => d.Name))
+                {
+                    <DataLinkCard DataPoint="dataPoint" />
+                }
+            </div>
+        }
+        else
+        {
+            <p><em>Loading realtime data...</em></p>
+        }
+    </div>
+    <div class="ui-card-footer">
+        <button class="ui-button-danger" @onclick="OnDisconnect" disabled="@IsLoading">Disconnect</button>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public EcuInfo? EcuInfo { get; set; }
+
+    [Parameter, EditorRequired]
+    public IReadOnlyList<RealtimeDataPoint> RealtimeData { get; set; } = [];
+
+    [Parameter]
+    public bool IsLoading { get; set; }
+
+    [Parameter, EditorRequired]
+    public EventCallback OnDisconnect { get; set; }
+}

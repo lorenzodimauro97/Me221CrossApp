@@ -1,0 +1,122 @@
+﻿@page "/tables"
+@using ME221CrossApp.UI.Components.Tables
+@inject ConnectionStateService ConnState
+@inject IEcuInteractionService EcuService
+@inject ILogger<Tables> Logger
+
+<PageTitle>Table Viewer</PageTitle>
+
+<h1>Table Viewer</h1>
+
+@if (!ConnState.IsConnected)
+{
+    <div class="alert alert-warning">Please connect to an ECU on the Home page to view tables.</div>
+}
+else
+{
+    <div class="ui-card">
+        <div class="ui-card-header">Select Table</div>
+        <div class="ui-card-body">
+            @if (_isLoading)
+            {
+                <p><em>Loading table list...</em></p>
+            }
+            else
+            {
+                <div class="ui-input-group">
+                    <select @bind="SelectedTableId" class="ui-select" disabled="@_isTableLoading">
+                        <option value="0">Select a table...</option>
+                        @foreach (var table in _tables)
+                        {
+                            <option value="@table.Id">@table.Name</option>
+                        }
+                    </select>
+                </div>
+            }
+        </div>
+    </div>
+
+    @if (_isTableLoading)
+    {
+        <div class="ui-card">
+            <div class="ui-card-body">
+                <p><em>Loading table data...</em></p>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="ui-card">
+            <div class="ui-card-body">
+                <TableView Table="_selectedTableData" />
+            </div>
+        </div>
+    }
+}
+
+
+@code {
+    private bool _isLoading;
+    private bool _isTableLoading;
+    private IReadOnlyList<EcuObjectDefinition> _tables = [];
+    private TableData? _selectedTableData;
+    
+    private ushort _selectedTableId;
+    private ushort SelectedTableId
+    {
+        get => _selectedTableId;
+        set
+        {
+            _selectedTableId = value;
+            _ = LoadTableDataAsync();
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (ConnState.IsConnected)
+        {
+            _isLoading = true;
+            try
+            {
+                var allObjects = await EcuService.GetObjectListAsync();
+                _tables = allObjects.Where(o => o.ObjectType == "Table").OrderBy(t => t.Name).ToList();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Failed to load object list for tables.");
+            }
+            finally
+            {
+                _isLoading = false;
+            }
+        }
+    }
+
+    private async Task LoadTableDataAsync()
+    {
+        if (SelectedTableId == 0)
+        {
+            _selectedTableData = null;
+            return;
+        }
+
+        _isTableLoading = true;
+        _selectedTableData = null;
+        await InvokeAsync(StateHasChanged);
+
+        try
+        {
+            _selectedTableData = await EcuService.GetTableAsync(SelectedTableId);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load data for table {TableId}", SelectedTableId);
+        }
+        finally
+        {
+            _isTableLoading = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+}

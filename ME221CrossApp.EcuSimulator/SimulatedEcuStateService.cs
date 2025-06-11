@@ -30,14 +30,31 @@ public class SimulatedEcuStateService(IEcuDefinitionService definitionService, I
             switch (ecuObject.ObjectType)
             {
                 case "Table":
-                    var xAxis = Enumerable.Range(0, 16).Select(i => i * 500f).ToArray();
-                    var yAxis = Enumerable.Range(0, 16).Select(i => i * 10f).ToArray();
-                    var output = new float[1 * 16];
-                    for (int i = 0; i < 16; i++)
+                    bool is3D = ecuObject.Id % 2 == 0;
+                    byte rows = is3D ? (byte)16 : (byte)1;
+                    const byte cols = 16;
+                    
+                    var xAxis = Enumerable.Range(0, cols).Select(i => i * 500f).ToArray();
+                    var yAxis = is3D ? Enumerable.Range(0, rows).Select(i => i * 10f).ToArray() : [];
+                    var output = new float[rows * cols];
+
+                    for (var r = 0; r < rows; r++)
                     {
-                        output[i] = (float)(Math.Sin(i / 15.0 * Math.PI) * 50 + 50);
+                        for (var c = 0; c < cols; c++)
+                        {
+                            var outputIndex = r * cols + c;
+                            if (is3D)
+                            {
+                                output[outputIndex] = (float)(Math.Sin(c / (cols - 1.0) * Math.PI) * Math.Cos(r / (rows - 1.0) * Math.PI) * 50 + 50);
+                            }
+                            else
+                            {
+                                output[outputIndex] = (float)(Math.Sin(c / (cols - 1.0) * Math.PI) * 50 + 50);
+                            }
+                        }
                     }
-                    _tables[ecuObject.Id] = new TableData(ecuObject.Id, ecuObject.Name, 0, true, 1, 16, xAxis, [], output);
+                    
+                    _tables[ecuObject.Id] = new TableData(ecuObject.Id, ecuObject.Name, 0, true, rows, cols, xAxis, yAxis, output);
                     break;
                 case "Driver":
                     var configParams = Enumerable.Range(0, 8).Select(i => (float)(i * 1.5)).ToList();

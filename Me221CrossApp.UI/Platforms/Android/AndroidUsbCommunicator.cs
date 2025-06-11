@@ -6,11 +6,13 @@ using Android.Hardware.Usb;
 using ME221CrossApp.Models;
 using ME221CrossApp.Services;
 using ME221CrossApp.Services.Helpers;
+using Microsoft.Extensions.Logging;
+using Microsoft.Maui.ApplicationModel;
 using Application = Android.App.Application;
 
 namespace Me221CrossApp.UI.Services;
 
-public sealed class AndroidUsbCommunicator : ISerialPortCommunicator
+public sealed class AndroidUsbCommunicator(ILogger<AndroidUsbCommunicator> logger) : ISerialPortCommunicator
 {
     private UsbManager? _usbManager;
     private UsbDevice? _device;
@@ -20,7 +22,7 @@ public sealed class AndroidUsbCommunicator : ISerialPortCommunicator
 
     private CancellationTokenSource? _cts;
     private readonly ConcurrentDictionary<ushort, TaskCompletionSource<Message>> _pendingCommands = new();
-    private readonly Channel<Message> _incomingMessageChannel = Channel.CreateUnbounded<Message>();
+    private Channel<Message> _incomingMessageChannel = Channel.CreateUnbounded<Message>();
 
     private const byte SyncByte1 = (byte)'M';
     private const byte SyncByte2 = (byte)'E';
@@ -29,6 +31,13 @@ public sealed class AndroidUsbCommunicator : ISerialPortCommunicator
 
     public async Task ConnectAsync(string portName, int baudRate, CancellationToken cancellationToken = default)
     {
+        if (_incomingMessageChannel.Reader.Completion.IsCompleted)
+        {
+            _incomingMessageChannel = Channel.CreateUnbounded<Message>();
+        }
+        _pendingCommands.Clear();
+        
+        logger.LogInformation("Attempting to connect to Android USB device {PortName}", portName);
         _usbManager = Application.Context.GetSystemService(Context.UsbService) as UsbManager;
         if (_usbManager is null)
         {
@@ -38,14 +47,17 @@ public sealed class AndroidUsbCommunicator : ISerialPortCommunicator
         _device = _usbManager.DeviceList?.Values.FirstOrDefault(d => d.DeviceName == portName);
         if (_device is null)
         {
+            logger.LogWarning("USB device {PortName} not found.", portName);
             throw new InvalidOperationException($"Device {portName} not found.");
         }
 
         if (!_usbManager.HasPermission(_device))
         {
+            logger.LogInformation("Requesting USB permission for device {PortName}", portName);
             var permissionGranted = await RequestPermissionAsync(_usbManager, _device, cancellationToken);
             if (!permissionGranted)
             {
+                logger.LogError("USB permission denied for device {PortName}", portName);
                 throw new UnauthorizedAccessException("Permission denied for USB device.");
             }
         }
@@ -83,16 +95,23 @@ public sealed class AndroidUsbCommunicator : ISerialPortCommunicator
 
         if (!IsConnected)
         {
+            logger.LogError("Could not establish a connection to a compatible USB device interface on {PortName}", portName);
             throw new InvalidOperationException("Could not establish a connection to the compatible USB device interface.");
         }
 
+        logger.LogInformation("Successfully connected to Android USB device {PortName}", portName);
+        if (_cts != null)
+        {
+            await _cts.CancelAsync();
+            _cts.Dispose();
+        }
         _cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         Task.Run(() => ReadLoopAsync(_cts.Token), _cts.Token);
     }
 
     private static Task<bool> RequestPermissionAsync(UsbManager manager, UsbDevice device, CancellationToken cancellationToken)
     {
-        var context = MainActivity.Instance ?? Application.Context;
+        var context = Platform.CurrentActivity ?? Application.Context;
         var receiver = new UsbPermissionReceiver();
         var intentFilter = new IntentFilter(UsbConstants.ActionUsbPermission);
 
@@ -114,7 +133,6 @@ public sealed class AndroidUsbCommunicator : ISerialPortCommunicator
             }
             catch (Java.Lang.IllegalArgumentException)
             {
-                // Already unregistered, ignore.
             }
         });
 
@@ -134,6 +152,7 @@ public sealed class AndroidUsbCommunicator : ISerialPortCommunicator
 
         if (bytesSent < frame.Length)
         {
+            logger.LogError("Failed to send full message to USB device. Sent {BytesSent} of {FrameLenth} bytes.", bytesSent, frame.Length);
             throw new IOException("Failed to send full message.");
         }
     }
@@ -142,6 +161,7 @@ public sealed class AndroidUsbCommunicator : ISerialPortCommunicator
     {
         if (!IsConnected || _cts is null) throw new InvalidOperationException("Device is not connected.");
 
+        logger.LogTrace("Sending message with Class={Class}, Command={Command}", request.Class, request.Command);
         var tcs = new TaskCompletionSource<Message>(TaskCreationOptions.RunContinuationsAsynchronously);
         var correlationId = (ushort)(request.Class << 8 | request.Command);
 
@@ -158,6 +178,7 @@ public sealed class AndroidUsbCommunicator : ISerialPortCommunicator
 
             if (completedTask != tcs.Task)
             {
+                logger.LogWarning("Timeout waiting for response from USB device for message with Class={Class}, Command={Command}", request.Class, request.Command);
                 throw new TimeoutException("The operation has timed out.");
             }
             return await tcs.Task;
@@ -194,7 +215,11 @@ public sealed class AndroidUsbCommunicator : ISerialPortCommunicator
                 while (await TryProcessFrame(processingStream, token)) { }
             }
             catch (OperationCanceledException) { break; }
-            catch (Exception) { await Task.Delay(50, token); }
+            catch (Exception ex) 
+            {
+                logger.LogError(ex, "Error in Android USB read loop.");
+                await Task.Delay(50, token); 
+            }
         }
     }
 
@@ -205,6 +230,7 @@ public sealed class AndroidUsbCommunicator : ISerialPortCommunicator
 
         if (stream.ReadByte() != SyncByte1 || stream.ReadByte() != SyncByte2)
         {
+            logger.LogTrace("Sync bytes not found, advancing stream.");
             stream.Position = startPosition + 1;
             return true;
         }
@@ -236,6 +262,7 @@ public sealed class AndroidUsbCommunicator : ISerialPortCommunicator
 
         if (receivedCrc != expectedCrc)
         {
+            logger.LogWarning("Invalid CRC on frame from USB device. Frame dropped.");
             stream.Position = startPosition + 1;
             return true;
         }
@@ -288,15 +315,23 @@ public sealed class AndroidUsbCommunicator : ISerialPortCommunicator
 
     public async ValueTask DisposeAsync()
     {
+        logger.LogInformation("Disposing Android USB communicator.");
         if (_cts != null)
         {
             await _cts.CancelAsync();
             _cts.Dispose();
+            _cts = null;
         }
+        
         _incomingMessageChannel.Writer.TryComplete();
         foreach (var tcs in _pendingCommands.Values) tcs.TrySetCanceled();
         _pendingCommands.Clear();
+        
         _connection?.Close();
         _connection?.Dispose();
+        _connection = null;
+        _inEndpoint = null;
+        _outEndpoint = null;
+        _device = null;
     }
 }

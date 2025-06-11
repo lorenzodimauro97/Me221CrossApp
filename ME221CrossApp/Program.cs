@@ -37,35 +37,20 @@ await Host.CreateDefaultBuilder(args)
 
 namespace ME221CrossApp
 {
-    public class ConsoleEcuHost : IHostedService
+    public class ConsoleEcuHost(
+        IHostApplicationLifetime appLifetime,
+        IConfiguration config,
+        IDeviceCommunicator communicator,
+        IEcuDefinitionService definitionService,
+        IEcuInteractionService ecuInteractionService,
+        IDeviceDiscoveryService deviceDiscoveryService)
+        : IHostedService
     {
-        private readonly IHostApplicationLifetime _appLifetime;
-        private readonly IConfiguration _config;
-        private readonly IDeviceCommunicator _communicator;
-        private readonly IEcuDefinitionService _definitionService;
-        private readonly IEcuInteractionService _ecuInteractionService;
-        private readonly IDeviceDiscoveryService _deviceDiscoveryService;
         private List<Operation> _operations = [];
-
-        public ConsoleEcuHost(
-            IHostApplicationLifetime appLifetime, 
-            IConfiguration config,
-            IDeviceCommunicator communicator,
-            IEcuDefinitionService definitionService,
-            IEcuInteractionService ecuInteractionService,
-            IDeviceDiscoveryService deviceDiscoveryService)
-        {
-            _appLifetime = appLifetime;
-            _config = config;
-            _communicator = communicator;
-            _definitionService = definitionService;
-            _ecuInteractionService = ecuInteractionService;
-            _deviceDiscoveryService = deviceDiscoveryService;
-        }
 
         public Task StartAsync(CancellationToken cancellationToken)
         {
-            _appLifetime.ApplicationStarted.Register(() =>
+            appLifetime.ApplicationStarted.Register(() =>
             {
                 Task.Run(async () =>
                 {
@@ -81,7 +66,7 @@ namespace ME221CrossApp
                     }
                     finally
                     {
-                        _appLifetime.StopApplication();
+                        appLifetime.StopApplication();
                     }
                 }, cancellationToken);
             });
@@ -98,8 +83,8 @@ namespace ME221CrossApp
     
         private async Task RunMainLoop(CancellationToken token)
         {
-            await _definitionService.LoadFromStoreAsync(token);
-            var initialDef = _definitionService.GetDefinition();
+            await definitionService.LoadFromStoreAsync(token);
+            var initialDef = definitionService.GetDefinition();
             Console.WriteLine($"Loaded {initialDef?.EcuObjects.Count ?? 0} definitions from local store.");
 
             LoadOperations();
@@ -115,14 +100,14 @@ namespace ME221CrossApp
                     continue;
                 }
             
-                if (!_communicator.IsConnected)
+                if (!communicator.IsConnected)
                 {
                     var portName = await SelectPortAsync();
                     if (string.IsNullOrEmpty(portName)) continue;
 
-                    var baudRate = _config.GetValue<int>("BaudRate");
+                    var baudRate = config.GetValue<int>("BaudRate");
                     Console.WriteLine($"Connecting to {portName}...");
-                    await _communicator.ConnectAsync(portName, baudRate, token);
+                    await communicator.ConnectAsync(portName, baudRate, token);
                     Console.ForegroundColor = ConsoleColor.Green;
                     Console.WriteLine("Connection successful.");
                     Console.ResetColor();
@@ -192,9 +177,9 @@ namespace ME221CrossApp
 
             try
             {
-                await _definitionService.MergeDefinitionFileAsync(filePath, token);
+                await definitionService.MergeDefinitionFileAsync(filePath, token);
                 Console.WriteLine("  Definitions imported and merged successfully.");
-                var newDef = _definitionService.GetDefinition();
+                var newDef = definitionService.GetDefinition();
                 Console.WriteLine($"  Store now contains {newDef?.EcuObjects.Count ?? 0} definitions.");
                 Console.WriteLine("  Please restart the application for changes to take full effect in all services.");
             }
@@ -208,7 +193,7 @@ namespace ME221CrossApp
 
         private async Task GetEcuInfoAsync(CancellationToken token)
         {
-            var info = await _ecuInteractionService.GetEcuInfoAsync(token);
+            var info = await ecuInteractionService.GetEcuInfoAsync(token);
             if (info is not null)
             {
                 Console.WriteLine($"  Product: {info.ProductName}");
@@ -226,7 +211,7 @@ namespace ME221CrossApp
 
         private async Task GetObjectListAsync(CancellationToken token)
         {
-            var objects = await _ecuInteractionService.GetObjectListAsync(token);
+            var objects = await ecuInteractionService.GetObjectListAsync(token);
             Console.WriteLine($"  Found {objects.Count} objects:");
             foreach (var obj in objects)
             {
@@ -236,7 +221,7 @@ namespace ME221CrossApp
 
         private async Task GetDataLinkListAsync(CancellationToken token)
         {
-            var dataLinks = await _ecuInteractionService.GetDataLinkListAsync(token);
+            var dataLinks = await ecuInteractionService.GetDataLinkListAsync(token);
             Console.WriteLine($"  Found {dataLinks.Count} datalinks:");
             foreach (var link in dataLinks)
             {
@@ -249,7 +234,7 @@ namespace ME221CrossApp
             Console.Write("Enter DataLink ID to read: ");
             if (ushort.TryParse(Console.ReadLine(), out var id))
             {
-                var dataPoint = await _ecuInteractionService.GetRealtimeDataValueAsync(id, token);
+                var dataPoint = await ecuInteractionService.GetRealtimeDataValueAsync(id, token);
                 if (dataPoint is not null)
                 {
                     Console.WriteLine($"  Value for {dataPoint.Name} (ID: {id}): {dataPoint.Value:F2}");
@@ -270,7 +255,7 @@ namespace ME221CrossApp
             Console.Write("Enter Table ID to read: ");
             if (ushort.TryParse(Console.ReadLine(), out var id))
             {
-                var table = await _ecuInteractionService.GetTableAsync(id, token);
+                var table = await ecuInteractionService.GetTableAsync(id, token);
                 if (table is not null)
                 {
                     Console.WriteLine($"  Table: {table.Name} (ID: {id})");
@@ -294,7 +279,7 @@ namespace ME221CrossApp
             Console.Write("Enter Driver ID to read: ");
             if (ushort.TryParse(Console.ReadLine(), out var id))
             {
-                var driver = await _ecuInteractionService.GetDriverAsync(id, token);
+                var driver = await ecuInteractionService.GetDriverAsync(id, token);
                 if (driver is not null)
                 {
                     Console.WriteLine($"  Driver: {driver.Name} (ID: {id})");
@@ -320,7 +305,7 @@ namespace ME221CrossApp
         
             var streamTask = Task.Run(async () =>
             {
-                await foreach (var dataPoints in _ecuInteractionService.StreamRealtimeDataAsync(linkedCts.Token))
+                await foreach (var dataPoints in ecuInteractionService.StreamRealtimeDataAsync(linkedCts.Token))
                 {
                     Console.Clear();
                     Console.ForegroundColor = ConsoleColor.DarkGray;
@@ -357,7 +342,7 @@ namespace ME221CrossApp
                 return;
             }
 
-            var table = await _ecuInteractionService.GetTableAsync(id, token);
+            var table = await ecuInteractionService.GetTableAsync(id, token);
             if (table is null)
             {
                 Console.WriteLine($"  Could not retrieve table with ID: {id}.");
@@ -398,7 +383,7 @@ namespace ME221CrossApp
             mutableOutput[index] = newOutputValue;
             var updatedTable = table with { Output = mutableOutput };
         
-            await _ecuInteractionService.UpdateTableAsync(updatedTable, token);
+            await ecuInteractionService.UpdateTableAsync(updatedTable, token);
             Console.WriteLine("  Table updated successfully.");
         }
 
@@ -407,7 +392,7 @@ namespace ME221CrossApp
             Console.Write("Enter Table ID to store: ");
             if (ushort.TryParse(Console.ReadLine(), out var id))
             {
-                await _ecuInteractionService.StoreTableAsync(id, token);
+                await ecuInteractionService.StoreTableAsync(id, token);
                 Console.WriteLine($"  Store command for table ID {id} sent successfully.");
             }
             else
@@ -421,7 +406,7 @@ namespace ME221CrossApp
             Console.Write("Enter Driver ID to update: ");
             if (ushort.TryParse(Console.ReadLine(), out var id))
             {
-                var driver = await _ecuInteractionService.GetDriverAsync(id, token);
+                var driver = await ecuInteractionService.GetDriverAsync(id, token);
                 if (driver is not null && driver.ConfigParams.Any())
                 {
                     Console.WriteLine($"  Current first config param for {driver.Name}: {driver.ConfigParams[0]:F2}");
@@ -432,7 +417,7 @@ namespace ME221CrossApp
                         mutableParams[0] = newValue;
                         var updatedDriver = driver with { ConfigParams = mutableParams };
                     
-                        await _ecuInteractionService.UpdateDriverAsync(updatedDriver, token);
+                        await ecuInteractionService.UpdateDriverAsync(updatedDriver, token);
                         Console.WriteLine("  Driver updated successfully.");
                     }
                     else
@@ -460,7 +445,7 @@ namespace ME221CrossApp
             Console.Write("Enter Driver ID to store: ");
             if (ushort.TryParse(Console.ReadLine(), out var id))
             {
-                await _ecuInteractionService.StoreDriverAsync(id, token);
+                await ecuInteractionService.StoreDriverAsync(id, token);
                 Console.WriteLine($"  Store command for driver ID {id} sent successfully.");
             }
             else
@@ -471,7 +456,7 @@ namespace ME221CrossApp
     
         private async Task<string?> SelectPortAsync()
         {
-            var portNames = await _deviceDiscoveryService.GetAvailableDevicesAsync();
+            var portNames = await deviceDiscoveryService.GetAvailableDevicesAsync();
             if (portNames.Count == 0)
             {
                 Console.WriteLine("No devices/ports found.");

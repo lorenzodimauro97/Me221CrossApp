@@ -1,0 +1,36 @@
+﻿<div class="table-responsive">
+    <table class="table table-bordered table-striped table-sm text-center">
+        <thead>
+        <tr>
+            @foreach (var x in Table.XAxis)
+            {
+                <th>@x.ToString("F1")</th>
+            }
+        </tr>
+        </thead>
+        <tbody>
+        <tr>
+            @foreach (var val in Table.Output)
+            {
+                <td style="background-color: @ColorHelper.GetColorForValue(val, _min, _max)">@val.ToString("F2")</td>
+            }
+        </tr>
+        </tbody>
+    </table>
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public TableData Table { get; set; } = null!;
+
+    private float _min, _max;
+
+    protected override void OnParametersSet()
+    {
+        if (Table.Output.Any())
+        {
+            _min = Table.Output.Min();
+            _max = Table.Output.Max();
+        }
+    }
+}

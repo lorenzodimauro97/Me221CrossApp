@@ -1,0 +1,139 @@
+﻿@inject IEcuDefinitionService DefinitionService
+@inject ConnectionStateService ConnState
+@inject ILogger<DefinitionManager> Logger
+
+<div class="ui-card-header">ECU Definitions</div>
+<div class="ui-card-body">
+    @if (!string.IsNullOrEmpty(_errorMessage))
+    {
+        <div class="alert alert-danger" role="alert">@_errorMessage</div>
+    }
+    @if (!string.IsNullOrEmpty(_statusMessage))
+    {
+        <div class="alert alert-info" role="alert">@_statusMessage</div>
+    }
+
+    <p>
+        <strong>Connected ECU Firmware:</strong>
+        <span class="code-block">@(ConnState.EcuInfo?.FirmwareVersion ?? "Not Connected")</span>
+    </p>
+    <p>
+        <strong>Stored Definitions Version:</strong>
+        <span class="code-block">@(_storedDefVersion ?? "Not Found")</span>
+    </p>
+
+    @if (ConnState.IsConnected && !string.IsNullOrEmpty(ConnState.EcuInfo?.FirmwareVersion) && ConnState.EcuInfo.FirmwareVersion != _storedDefVersion)
+    {
+        <div class="alert alert-warning">
+            The stored definitions do not match the connected ECU's firmware. Please update the definitions.
+        </div>
+    }
+
+    <div class="button-group">
+        <button class="ui-button" @onclick="UpdateDefinitions" disabled="@_isLoading">
+            Load from .mefw file
+        </button>
+        <button class="ui-button-danger" @onclick="ClearDefinitions" disabled="@_isLoading">
+            Clear Stored Definitions
+        </button>
+    </div>
+</div>
+
+@code {
+    private string? _storedDefVersion;
+    private string? _statusMessage;
+    private string? _errorMessage;
+    private bool _isLoading;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDefinitionVersion();
+    }
+
+    private async Task LoadDefinitionVersion()
+    {
+        await DefinitionService.LoadFromStoreAsync();
+        _storedDefVersion = DefinitionService.GetDefinition()?.DefVersion;
+    }
+
+    private async Task UpdateDefinitions()
+    {
+        _isLoading = true;
+        _statusMessage = "Waiting for file selection...";
+        _errorMessage = null;
+        await InvokeAsync(StateHasChanged);
+        Logger.LogInformation("User initiated definition update from file.");
+
+        try
+        {
+            var customFileType = new FilePickerFileType(
+                new Dictionary<DevicePlatform, IEnumerable<string>>
+                {
+                    { DevicePlatform.WinUI, new[] { ".mefw", ".xml" } },
+                    { DevicePlatform.Android, new[] { "application/xml", "text/xml" } },
+                    { DevicePlatform.iOS, new[] { "public.xml" } },
+                    { DevicePlatform.MacCatalyst, new[] { "public.xml" } },
+                });
+            
+            var result = await FilePicker.Default.PickAsync(new PickOptions
+            {
+                PickerTitle = "Please select an MEFW definition file",
+                FileTypes = customFileType
+            });
+
+            if (result != null)
+            {
+                _statusMessage = $"Processing {result.FileName}...";
+                Logger.LogInformation("User selected file: {FileName}", result.FileName);
+                await InvokeAsync(StateHasChanged);
+                
+                await DefinitionService.MergeDefinitionFileAsync(result.FullPath);
+                await LoadDefinitionVersion();
+                _statusMessage = "Definitions updated successfully. You can now return to the Home page to connect.";
+            }
+            else
+            {
+                _statusMessage = "File selection cancelled.";
+                Logger.LogInformation("User cancelled file selection for definition update.");
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Error updating definitions: {ex.Message}";
+            _statusMessage = null;
+            Logger.LogError(ex, "Error updating definitions from file.");
+        }
+        finally
+        {
+            _isLoading = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private async Task ClearDefinitions()
+    {
+        _isLoading = true;
+        _errorMessage = null;
+        _statusMessage = "Clearing definitions...";
+        await InvokeAsync(StateHasChanged);
+        Logger.LogInformation("User initiated clearing of stored definitions.");
+
+        try
+        {
+            await DefinitionService.ClearDefinitionsAsync();
+            await LoadDefinitionVersion();
+            _statusMessage = "Definitions cleared.";
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Error clearing definitions: {ex.Message}";
+            _statusMessage = null;
+            Logger.LogError(ex, "Error clearing definitions.");
+        }
+        finally
+        {
+            _isLoading = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+}

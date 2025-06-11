@@ -1,5 +1,244 @@
 ﻿@page "/"
+@inject IDeviceDiscoveryService DeviceDiscoveryService
+@inject CommunicationMux CommMux
+@inject IEcuInteractionService EcuService
+@inject IEcuDefinitionService DefinitionService
+@inject NavigationManager NavManager
+@inject ConnectionStateService ConnState
+@inject ILogger<Home> Logger
 
-<h1>Hello, world!</h1>
+@implements IAsyncDisposable
 
-Welcome to your new app.
+<h1>ECU Connect</h1>
+
+@if (!string.IsNullOrEmpty(_errorMessage))
+{
+    <div class="alert alert-danger mt-3" role="alert">@_errorMessage</div>
+}
+@if (!string.IsNullOrEmpty(_statusMessage))
+{
+    <div class="alert alert-info mt-3" role="alert">@_statusMessage</div>
+}
+
+@if (!ConnState.IsConnected)
+{
+    <ConnectionView UsbDevices="_usbDevices"
+                    IsDevelopment="IsDevelopment"
+                    IsLoading="_isLoading"
+                    @bind-SelectedUsbDevice="SelectedUsbDevice"
+                    @bind-SimulatorIp="SimulatorIp"
+                    OnConnect="Connect"/>
+}
+else
+{
+    <DashboardView EcuInfo="ConnState.EcuInfo"
+                   RealtimeData="_realtimeData"
+                   IsLoading="_isLoading"
+                   OnDisconnect="Disconnect"/>
+}
+
+
+@code {
+    private IReadOnlyList<DiscoveredDevice> _usbDevices = [];
+    private string? SelectedUsbDevice { get; set; }
+    private string SimulatorIp { get; set; } = "127.0.0.1:54321";
+    private bool IsDevelopment { get; set; }
+
+    private string? _errorMessage;
+    private string? _statusMessage;
+    private bool _isLoading;
+
+    private readonly Dictionary<ushort, RealtimeDataPoint> _realtimeDataDict = new();
+    private IReadOnlyList<RealtimeDataPoint> _realtimeData = [];
+    private CancellationTokenSource? _streamingCts;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Logger.LogInformation("Home page initialized.");
+#if DEBUG
+        IsDevelopment = true;
+#endif
+
+        ConnState.OnChange += StateHasChanged;
+        DefinitionService.OnDefinitionUpdated += HandleDefinitionUpdate;
+
+        if (ConnState.IsConnected)
+        {
+            await UpdateStatusMessage("Resuming real-time data stream...");
+            await StartStreamingAsync();
+            return;
+        }
+
+        _isLoading = true;
+        await UpdateStatusMessage("Discovering USB devices...");
+
+        try
+        {
+            _usbDevices = await DeviceDiscoveryService.GetAvailableDevicesAsync();
+            _statusMessage = "Ready to connect.";
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Failed to discover devices: {ex.Message}";
+            _statusMessage = "Discovery failed.";
+            Logger.LogError(ex, "Failed to discover devices.");
+        }
+        finally
+        {
+            _isLoading = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private void HandleDefinitionUpdate()
+    {
+        Logger.LogInformation("ECU definition updated, disconnecting if connected.");
+        if (ConnState.IsConnected)
+        {
+            _ = InvokeAsync(async () =>
+            {
+                await Disconnect();
+                _errorMessage = null;
+                await UpdateStatusMessage("ECU Definitions changed. Please reconnect.");
+            });
+        }
+    }
+
+    private async Task Connect(CommunicatorType type)
+    {
+        _isLoading = true;
+        _errorMessage = null;
+        var portName = type == CommunicatorType.Serial ? SelectedUsbDevice : SimulatorIp;
+        Logger.LogInformation("Attempting to connect via {CommunicatorType} to {PortName}", type, portName);
+        await UpdateStatusMessage("Connecting...");
+
+        try
+        {
+            CommMux.SetActiveCommunicator(type);
+            await CommMux.ConnectAsync(portName!, 230400);
+
+            await UpdateStatusMessage("Connected. Fetching ECU info...");
+
+            var ecuInfo = await EcuService.GetEcuInfoAsync();
+            if (ecuInfo is null)
+            {
+                throw new InvalidOperationException("Failed to retrieve ECU information.");
+            }
+            
+            Logger.LogInformation("Successfully connected to ECU {ProductName} on firmware {FirmwareVersion}", ecuInfo.ProductName, ecuInfo.FirmwareVersion);
+            ConnState.SetConnectionState(true, ecuInfo, type);
+
+            await DefinitionService.LoadFromStoreAsync();
+            var definition = DefinitionService.GetDefinition();
+
+            if (string.IsNullOrEmpty(definition?.DefVersion) || definition.DefVersion != ecuInfo.FirmwareVersion)
+            {
+                if (IsDevelopment)
+                {
+                    Logger.LogWarning("Definition mismatch, but continuing due to development mode. Def: '{DefVersion}', ECU: '{FirmwareVersion}'", definition?.DefVersion, ecuInfo.FirmwareVersion);
+                    await UpdateStatusMessage("You're on Development, definition verification will not be enforced, but IDs may mismatch.");
+                }
+                else
+                {
+                    Logger.LogWarning("ECU definition version '{DefVersion}' does not match firmware version '{FirmwareVersion}'. Redirecting to settings.", definition?.DefVersion, ecuInfo.FirmwareVersion);
+                    await UpdateStatusMessage("ECU definitions are missing or incorrect for this firmware. Redirecting to settings...");
+                    await Task.Delay(1500);
+                    NavManager.NavigateTo("/settings");
+                    return;
+                }
+            }
+
+            await UpdateStatusMessage("Correct definitions found. Starting real-time data stream...");
+            await StartStreamingAsync();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Connection failed: {ex.Message}";
+            Logger.LogError(ex, "Connection failed for {PortName}", portName);
+            ConnState.Disconnect();
+            await Disconnect();
+        }
+        finally
+        {
+            _isLoading = false;
+            if (!ConnState.IsConnected)
+                await UpdateStatusMessage("Ready");
+        }
+    }
+
+    private async Task StartStreamingAsync()
+    {
+        if (_streamingCts is not null)
+        {
+            await _streamingCts.CancelAsync();
+            _streamingCts.Dispose();
+        }
+        _streamingCts = new CancellationTokenSource();
+        _realtimeDataDict.Clear();
+        _realtimeData = [];
+        await InvokeAsync(StateHasChanged);
+
+        Logger.LogInformation("Starting real-time data stream.");
+        try
+        {
+            await foreach (var dataPoints in EcuService.StreamRealtimeDataAsync(_streamingCts.Token))
+            {
+                foreach (var dp in dataPoints)
+                {
+                    _realtimeDataDict[dp.Id] = dp;
+                }
+                _realtimeData = _realtimeDataDict.Values.ToList();
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            Logger.LogInformation("Real-time data stream stopped.");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "An error occurred during real-time data streaming.");
+            await UpdateStatusMessage($"Streaming error: {ex.Message}");
+        }
+    }
+
+    private async Task Disconnect()
+    {
+        _isLoading = true;
+        Logger.LogInformation("Disconnecting from device.");
+        await UpdateStatusMessage("Disconnecting...");
+
+        if (_streamingCts is not null)
+        {
+            await _streamingCts.CancelAsync();
+            _streamingCts.Dispose();
+            _streamingCts = null;
+        }
+
+        _realtimeDataDict.Clear();
+        _realtimeData = [];
+        await CommMux.DisposeAsync();
+        ConnState.Disconnect();
+
+        _isLoading = false;
+        _statusMessage = "Disconnected.";
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task UpdateStatusMessage(string text)
+    {
+        _statusMessage = text;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        ConnState.OnChange -= StateHasChanged;
+        DefinitionService.OnDefinitionUpdated -= HandleDefinitionUpdate;
+        if (_streamingCts != null)
+        {
+            await _streamingCts.CancelAsync();
+            _streamingCts.Dispose();
+        }
+    }
+}

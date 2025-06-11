@@ -4,6 +4,7 @@ public record EcuDefinition(
     string ProductName,
     string ModelName,
     string Version,
+    string DefVersion,
     IReadOnlyDictionary<ushort, EcuObjectDefinition> EcuObjects
 );
 

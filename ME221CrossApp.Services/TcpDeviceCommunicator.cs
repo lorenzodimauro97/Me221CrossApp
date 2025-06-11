@@ -4,16 +4,18 @@ using System.Net.Sockets;
 using System.Threading.Channels;
 using ME221CrossApp.Models;
 using ME221CrossApp.Services.Helpers;
+using Microsoft.Extensions.Logging;
 
 namespace ME221CrossApp.Services;
 
-public sealed class TcpDeviceCommunicator : ITcpPortCommunicator
+public sealed class TcpDeviceCommunicator(ILogger<TcpDeviceCommunicator> logger)
+    : ISerialPortCommunicator, ITcpPortCommunicator
 {
     private TcpClient? _tcpClient;
     private NetworkStream? _stream;
     private CancellationTokenSource? _cts;
     private readonly ConcurrentDictionary<ushort, TaskCompletionSource<Message>> _pendingCommands = new();
-    private readonly Channel<Message> _incomingMessageChannel = Channel.CreateUnbounded<Message>();
+    private Channel<Message> _incomingMessageChannel = Channel.CreateUnbounded<Message>();
 
     private const byte SyncByte1 = (byte)'M';
     private const byte SyncByte2 = (byte)'E';
@@ -22,18 +24,31 @@ public sealed class TcpDeviceCommunicator : ITcpPortCommunicator
 
     public async Task ConnectAsync(string portName, int baudRate, CancellationToken cancellationToken = default)
     {
+        if (_incomingMessageChannel.Reader.Completion.IsCompleted)
+        {
+            _incomingMessageChannel = Channel.CreateUnbounded<Message>();
+        }
+        _pendingCommands.Clear();
+        
         var parts = portName.Split(':');
         if (parts.Length != 2 || !IPAddress.TryParse(parts[0], out var ip) || !int.TryParse(parts[1], out var port))
         {
             throw new ArgumentException("Invalid endpoint format. Expected 'IP:Port'.", nameof(portName));
         }
 
+        logger.LogInformation("Connecting to TCP device at {Endpoint}", portName);
         _tcpClient = new TcpClient();
         await _tcpClient.ConnectAsync(ip, port, cancellationToken);
         _stream = _tcpClient.GetStream();
 
+        if (_cts != null)
+        {
+            await _cts.CancelAsync();
+            _cts.Dispose();
+        }
         _cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         Task.Run(() => ReadLoopAsync(_cts.Token), _cts.Token);
+        logger.LogInformation("Successfully connected to {Endpoint}", portName);
     }
 
     public async Task PostMessageAsync(Message request, CancellationToken cancellationToken = default)
@@ -54,7 +69,8 @@ public sealed class TcpDeviceCommunicator : ITcpPortCommunicator
         {
             throw new InvalidOperationException("Device is not connected.");
         }
-
+        
+        logger.LogTrace("Sending message with Class={Class}, Command={Command}", request.Class, request.Command);
         var tcs = new TaskCompletionSource<Message>(TaskCreationOptions.RunContinuationsAsynchronously);
         var correlationId = (ushort)(request.Class << 8 | request.Command);
 
@@ -73,6 +89,7 @@ public sealed class TcpDeviceCommunicator : ITcpPortCommunicator
 
             if (completedTask != tcs.Task)
             {
+                logger.LogWarning("Timeout waiting for response to message with Class={Class}, Command={Command}", request.Class, request.Command);
                 throw new TimeoutException("The operation has timed out.");
             }
 
@@ -134,7 +151,11 @@ public sealed class TcpDeviceCommunicator : ITcpPortCommunicator
                 var receivedCrc = (ushort)(crcBytes[0] | (crcBytes[1] << 8));
                 var expectedCrc = Fletcher16Checksum.Compute(messageContent);
 
-                if (receivedCrc != expectedCrc) continue;
+                if (receivedCrc != expectedCrc)
+                {
+                    logger.LogWarning("Invalid CRC received. Frame dropped.");
+                    continue;
+                }
 
                 var payload = new byte[payloadSize];
                 if (payloadSize > 0)
@@ -146,10 +167,12 @@ public sealed class TcpDeviceCommunicator : ITcpPortCommunicator
                 var correlationId = (ushort)(message.Class << 8 | message.Command);
                 if (_pendingCommands.TryRemove(correlationId, out var tcs))
                 {
+                    logger.LogTrace("Received response for Class={Class}, Command={Command}", message.Class, message.Command);
                     tcs.TrySetResult(message);
                 }
                 else
                 {
+                    logger.LogTrace("Received unsolicited message with Type={Type}, Class={Class}, Command={Command}", message.Type, message.Class, message.Command);
                     await _incomingMessageChannel.Writer.WriteAsync(message, token);
                 }
             }
@@ -157,7 +180,7 @@ public sealed class TcpDeviceCommunicator : ITcpPortCommunicator
             catch (IOException) { break; }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error in TCP communicator: {ex.Message}");
+                logger.LogError(ex, "Error in TCP communicator read loop");
                 await Task.Delay(100, token);
             }
         }
@@ -186,10 +209,12 @@ public sealed class TcpDeviceCommunicator : ITcpPortCommunicator
 
     public async ValueTask DisposeAsync()
     {
+        logger.LogInformation("Disposing TCP communicator.");
         if (_cts != null)
         {
             await _cts.CancelAsync();
             _cts.Dispose();
+            _cts = null;
         }
 
         _incomingMessageChannel.Writer.TryComplete();
@@ -202,6 +227,9 @@ public sealed class TcpDeviceCommunicator : ITcpPortCommunicator
 
         _stream?.Dispose();
         _tcpClient?.Dispose();
+        _stream = null;
+        _tcpClient = null;
+
         await ValueTask.CompletedTask;
     }
 }

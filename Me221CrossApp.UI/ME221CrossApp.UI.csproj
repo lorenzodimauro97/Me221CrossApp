@@ -81,9 +81,26 @@
     </ItemGroup>
 
     <ItemGroup>
+        <PackageReference Include="BlazorTablerIcons" Version="1.0.0" />
         <PackageReference Include="Microsoft.Maui.Controls" Version="10.0.0-preview.5.25306.5" />
         <PackageReference Include="Microsoft.AspNetCore.Components.WebView.Maui" Version="8.0.100" />
         <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.0-preview.5.25277.114" />
+        <PackageReference Include="Serilog" Version="4.3.1-dev-02373" />
+        <PackageReference Include="Serilog.Extensions.Hosting" Version="9.0.1-dev-02307" />
+        <PackageReference Include="Serilog.Sinks.Console" Version="6.0.1-dev-00953" />
+        <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
+        <PackageReference Include="System.IO.Ports" Version="10.0.0-preview.5.25277.114" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\ME221CrossApp.Models\ME221CrossApp.Models.csproj" />
+      <ProjectReference Include="..\ME221CrossApp.Services\ME221CrossApp.Services.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Content Update="Components\Tables\TableView3D.razor.css">
+        <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+      </Content>
     </ItemGroup>
 
 </Project>

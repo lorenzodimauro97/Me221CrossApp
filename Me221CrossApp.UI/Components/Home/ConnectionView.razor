@@ -1,0 +1,55 @@
+﻿<div class="ui-card">
+    <div class="ui-card-header">Device Connection</div>
+    <div class="ui-card-body">
+        <h5>Connect via USB</h5>
+        <div class="ui-input-group">
+            <select @bind="SelectedUsbDevice" class="ui-select" disabled="@IsLoading">
+                <option value="">Select USB Device...</option>
+                @if (UsbDevices.Any())
+                {
+                    @foreach (var device in UsbDevices)
+                    {
+                        <option value="@device.Id">@device.Name</option>
+                    }
+                }
+            </select>
+            <button class="ui-button" @onclick="() => OnConnect.InvokeAsync(CommunicatorType.Serial)" disabled="@(string.IsNullOrEmpty(SelectedUsbDevice) || IsLoading)">Connect</button>
+        </div>
+
+        @if (IsDevelopment)
+        {
+            <div class="divider"></div>
+            <h5>Connect to Simulator (Debug)</h5>
+            <div class="ui-input-group">
+                <input @bind="SimulatorIp" class="ui-input" disabled="@IsLoading"/>
+                <button class="ui-button-secondary" @onclick="() => OnConnect.InvokeAsync(CommunicatorType.Tcp)" disabled="@(string.IsNullOrEmpty(SimulatorIp) || IsLoading)">Connect</button>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public IReadOnlyList<DiscoveredDevice> UsbDevices { get; set; } = [];
+
+    [Parameter]
+    public string? SelectedUsbDevice { get; set; }
+
+    [Parameter]
+    public EventCallback<string?> SelectedUsbDeviceChanged { get; set; }
+
+    [Parameter]
+    public string SimulatorIp { get; set; } = "";
+
+    [Parameter]
+    public EventCallback<string> SimulatorIpChanged { get; set; }
+
+    [Parameter]
+    public bool IsDevelopment { get; set; }
+
+    [Parameter]
+    public bool IsLoading { get; set; }
+
+    [Parameter, EditorRequired]
+    public EventCallback<CommunicatorType> OnConnect { get; set; }
+}

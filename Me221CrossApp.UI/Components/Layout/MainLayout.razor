@@ -1,17 +1,31 @@
 ﻿@inherits LayoutComponentBase
 
-<div class="page">
-    <div class="sidebar">
-        <NavMenu />
-    </div>
+@code {
+    public bool? IsMobile { get; set; }
+}
 
-    <main>
-        <div class="top-row px-4">
-            <a href="https://learn.microsoft.com/aspnet/core/" target="_blank">About</a>
+<DeviceDetector @bind-IsMobile="IsMobile"></DeviceDetector>
+
+@if (IsMobile != null)
+{
+    <div class="grid-row">
+        <div class="@(IsMobile == true ? "grid-col-12" : "grid-col-1")">
+            <div class="ui-card">
+                @if (IsMobile == false)
+                {
+                    <div class="ui-card-header">Navigation</div>
+                }
+                <div class="ui-card-body" style="display: flex; flex-direction: column; gap: 1rem; justify-content: center; align-items: center;">
+                    @* This correctly passes the state down to the NavMenu *@
+                    <NavMenu IsMobile="(bool)IsMobile"></NavMenu>
+                </div>
+            </div>
         </div>
-
-        <article class="content px-4">
-            @Body
-        </article>
-    </main>
-</div>
+        <div class="@(IsMobile == true ? "grid-col-12" : "grid-col-11")">
+            <div class="ui-card">
+                <div class="ui-card-header">Right Column</div>
+                <div class="ui-card-body">@Body</div>
+            </div>
+        </div>
+    </div>
+}

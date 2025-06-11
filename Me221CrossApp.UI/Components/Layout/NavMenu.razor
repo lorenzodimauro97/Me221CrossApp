@@ -1,27 +1,54 @@
-﻿<div class="top-row ps-3 navbar navbar-dark">
-    <div class="container-fluid">
-        <a class="navbar-brand" href="">ME221CrossApp.UI</a>
-    </div>
-</div>
+﻿@* No changes needed for the HTML structure itself *@
+<nav style="@NavContainerStyle">
+    <NavLink class="nav-item" href="" Match="NavLinkMatch.All">
+        <TablerIcon OutlineIcon="TablerIconOutlineName.Home" Size="40px" />
+        @if (IsMobile)
+        {
+            <span>Home</span>
+        }
+    </NavLink>
+    <NavLink class="nav-item" href="tables">
+        <TablerIcon OutlineIcon="TablerIconOutlineName.Table" Size="40px" />
+        @if (IsMobile)
+        {
+            <span>Tables</span>
+        }
+    </NavLink>
+    <NavLink class="nav-item" href="settings">
+        <TablerIcon OutlineIcon="TablerIconOutlineName.Settings" Size="40px" />
+        @if (IsMobile)
+        {
+            <span>Settings</span>
+        }
+    </NavLink>
+</nav>
 
-<input type="checkbox" title="Navigation menu" class="navbar-toggler" />
+@code {
+    [Parameter]
+    public required bool IsMobile { get; set; }
 
-<div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').click()">
-    <nav class="flex-column">
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
-                <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Home
-            </NavLink>
-        </div>
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="counter">
-                <span class="bi bi-plus-square-fill-nav-menu" aria-hidden="true"></span> Counter
-            </NavLink>
-        </div>
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="weather">
-                <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Weather
-            </NavLink>
-        </div>
-    </nav>
-</div>
+    /// <summary>
+    /// This computed property applies the correct styling to the <nav> container.
+    /// </summary>
+    private string NavContainerStyle => IsMobile
+        // Mobile: Use flexbox to spread items out and give them space.
+        ? "display: flex; justify-content: space-around; align-items: center; width: 100%; padding: 0.5rem 0;"
+        // Desktop: Use a flex column to stack items vertically. The centering is
+        // handled by the parent div in MainLayout.razor.
+        : "display: flex; flex-direction: column; gap: 1.5rem;";
+}
+
+<style>
+    /* Style for the NavLink items in NavMenu.razor */
+    .nav-item {
+        display: flex;
+        flex-direction: column; /* Stacks icon and text */
+        align-items: center;
+        gap: 4px;
+        text-decoration: none;
+    }
+
+    .nav-item.active {
+        color: #ffffff;
+    }
+</style>

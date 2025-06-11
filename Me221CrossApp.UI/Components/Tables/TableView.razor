@@ -1,0 +1,20 @@
+﻿@if (Table != null)
+{
+    @if (Table.Rows > 1)
+    {
+        <TableView3D Table="Table" />
+    }
+    else
+    {
+        <TableView2D Table="Table" />
+    }
+}
+else
+{
+    <div class="alert alert-info">Select a table from the list above to view its data.</div>
+}
+
+@code {
+    [Parameter]
+    public TableData? Table { get; set; }
+}

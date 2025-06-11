@@ -1,0 +1,9 @@
+﻿<div class="data-card">
+    <div class="data-card-name">@DataPoint.Name</div>
+    <div class="data-card-value">@DataPoint.Value.ToString("F2")</div>
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public RealtimeDataPoint DataPoint { get; set; } = null!;
+}

@@ -4,15 +4,16 @@ using System.Threading.Channels;
 using ME221CrossApp.Models;
 using ME221CrossApp.Services;
 using ME221CrossApp.Services.Helpers;
+using Microsoft.Extensions.Logging;
 
 namespace Me221CrossApp.UI.Services.Windows;
 
-public sealed class DeviceCommunicator : ISerialPortCommunicator
+public sealed class WindowsDeviceCommunicator(ILogger<WindowsDeviceCommunicator> logger) : ISerialPortCommunicator
 {
     private SerialPort? _serialPort;
     private CancellationTokenSource? _cts;
     private readonly ConcurrentDictionary<ushort, TaskCompletionSource<Message>> _pendingCommands = new();
-    private readonly Channel<Message> _incomingMessageChannel = Channel.CreateUnbounded<Message>();
+    private Channel<Message> _incomingMessageChannel = Channel.CreateUnbounded<Message>();
 
     private const byte SyncByte1 = (byte)'M';
     private const byte SyncByte2 = (byte)'E';
@@ -21,6 +22,13 @@ public sealed class DeviceCommunicator : ISerialPortCommunicator
 
     public Task ConnectAsync(string portName, int baudRate, CancellationToken cancellationToken = default)
     {
+        if (_incomingMessageChannel.Reader.Completion.IsCompleted)
+        {
+            _incomingMessageChannel = Channel.CreateUnbounded<Message>();
+        }
+        _pendingCommands.Clear();
+        
+        logger.LogInformation("Opening serial port {PortName} at {BaudRate} baud.", portName, baudRate);
         _serialPort = new SerialPort(portName, baudRate)
         {
             ReadTimeout = 500,
@@ -28,9 +36,13 @@ public sealed class DeviceCommunicator : ISerialPortCommunicator
         };
         _serialPort.Open();
 
+        if (_cts != null)
+        {
+            _cts.Cancel();
+            _cts.Dispose();
+        }
         _cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         Task.Run(() => ReadLoopAsync(_cts.Token), _cts.Token);
-
         return Task.CompletedTask;
     }
 
@@ -52,7 +64,8 @@ public sealed class DeviceCommunicator : ISerialPortCommunicator
         {
             throw new InvalidOperationException("Device is not connected.");
         }
-
+        
+        logger.LogTrace("Sending message with Class={Class}, Command={Command}", request.Class, request.Command);
         var tcs = new TaskCompletionSource<Message>(TaskCreationOptions.RunContinuationsAsynchronously);
 
         var correlationId = (ushort)(request.Class << 8 | request.Command);
@@ -72,6 +85,7 @@ public sealed class DeviceCommunicator : ISerialPortCommunicator
 
             if (completedTask != tcs.Task)
             {
+                logger.LogWarning("Timeout waiting for response from serial device for message with Class={Class}, Command={Command}", request.Class, request.Command);
                 throw new TimeoutException("The operation has timed out.");
             }
 
@@ -162,7 +176,7 @@ public sealed class DeviceCommunicator : ISerialPortCommunicator
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Something terrible happened in DeviceCommunicator. {ex}");
+                logger.LogError(ex, "Error in serial port read loop for {PortName}", _serialPort?.PortName);
                 await Task.Delay(100, token);
             }
         }
@@ -191,10 +205,12 @@ public sealed class DeviceCommunicator : ISerialPortCommunicator
 
     public async ValueTask DisposeAsync()
     {
+        logger.LogInformation("Disposing Windows serial port communicator for {PortName}", _serialPort?.PortName);
         if (_cts != null)
         {
             await _cts.CancelAsync();
             _cts.Dispose();
+            _cts = null;
         }
 
         _incomingMessageChannel.Writer.TryComplete();
@@ -212,6 +228,7 @@ public sealed class DeviceCommunicator : ISerialPortCommunicator
                 _serialPort.Close();
             }
             _serialPort.Dispose();
+            _serialPort = null;
         }
         await ValueTask.CompletedTask;
     }
