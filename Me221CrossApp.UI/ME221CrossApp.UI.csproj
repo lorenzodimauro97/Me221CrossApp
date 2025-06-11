@@ -22,7 +22,7 @@
         <Nullable>enable</Nullable>
 
         <!-- Display name -->
-        <ApplicationTitle>ME221CrossApp.UI</ApplicationTitle>
+        <ApplicationTitle>ME Cross App</ApplicationTitle>
 
         <!-- App Identifier -->
         <ApplicationId>com.scippo97productions.me221.app</ApplicationId>
@@ -83,9 +83,9 @@
     </ItemGroup>
 
     <ItemGroup>
-        <PackageReference Include="BlazorTablerIcons" Version="1.0.0" />
+        <PackageReference Include="BlazorTablerIcons" Version="1.0.1" />
         <PackageReference Include="Microsoft.Maui.Controls" Version="10.0.0-preview.5.25306.5" />
-        <PackageReference Include="Microsoft.AspNetCore.Components.WebView.Maui" Version="8.0.100" />
+        <PackageReference Include="Microsoft.AspNetCore.Components.WebView.Maui" Version="10.0.0-preview.5.25306.5" />
         <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.0-preview.5.25277.114" />
         <PackageReference Include="Serilog" Version="4.3.1-dev-02373" />
         <PackageReference Include="Serilog.Extensions.Hosting" Version="9.0.1-dev-02307" />
