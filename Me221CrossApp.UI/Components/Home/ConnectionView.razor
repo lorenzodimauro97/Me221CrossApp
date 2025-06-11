@@ -3,7 +3,7 @@
     <div class="ui-card-body">
         <h5>Connect via USB</h5>
         <div class="ui-input-group">
-            <select @bind="SelectedUsbDevice" class="ui-select" disabled="@IsLoading">
+            <select @bind="CurrentSelectedUsbDevice" class="ui-select" disabled="@IsLoading">
                 <option value="">Select USB Device...</option>
                 @if (UsbDevices.Any())
                 {
@@ -21,7 +21,7 @@
             <div class="divider"></div>
             <h5>Connect to Simulator (Debug)</h5>
             <div class="ui-input-group">
-                <input @bind="SimulatorIp" class="ui-input" disabled="@IsLoading"/>
+                <input @bind="CurrentSimulatorIp" class="ui-input" disabled="@IsLoading" />
                 <button class="ui-button-secondary" @onclick="() => OnConnect.InvokeAsync(CommunicatorType.Tcp)" disabled="@(string.IsNullOrEmpty(SimulatorIp) || IsLoading)">Connect</button>
             </div>
         }
@@ -38,11 +38,37 @@
     [Parameter]
     public EventCallback<string?> SelectedUsbDeviceChanged { get; set; }
 
+    private string? CurrentSelectedUsbDevice
+    {
+        get => SelectedUsbDevice;
+        set
+        {
+            if (SelectedUsbDevice != value)
+            {
+                SelectedUsbDevice = value;
+                _ = SelectedUsbDeviceChanged.InvokeAsync(value);
+            }
+        }
+    }
+
     [Parameter]
     public string SimulatorIp { get; set; } = "";
 
     [Parameter]
     public EventCallback<string> SimulatorIpChanged { get; set; }
+
+    private string CurrentSimulatorIp
+    {
+        get => SimulatorIp;
+        set
+        {
+            if (SimulatorIp != value)
+            {
+                SimulatorIp = value;
+                _ = SimulatorIpChanged.InvokeAsync(value);
+            }
+        }
+    }
 
     [Parameter]
     public bool IsDevelopment { get; set; }

@@ -1,4 +1,6 @@
-﻿using System.Text.Json;
+﻿// File: C:\Users\Administrator\RiderProjects\Me221CrossApp\ME221CrossApp.Services\EcuDefinitionService.cs
+//--------------------------------------------------
+using System.Text.Json;
 using System.Xml.Linq;
 using ME221CrossApp.Models;
 using Microsoft.Extensions.Logging;
@@ -27,7 +29,7 @@ public class EcuDefinitionService : IEcuDefinitionService
         ecuObject = null;
         return _definition?.EcuObjects.TryGetValue(id, out ecuObject) ?? false;
     }
-    
+
     public async Task LoadFromStoreAsync(CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("Loading ECU definitions from {StorePath}", _definitionStorePath);
@@ -43,9 +45,9 @@ public class EcuDefinitionService : IEcuDefinitionService
             await using var storeStream = new FileStream(_definitionStorePath, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, useAsync: true);
             var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
             _definition = await JsonSerializer.DeserializeAsync<EcuDefinition>(storeStream, options, cancellationToken);
-            if (_definition is null)
+            if (_definition is null || _definition.EcuObjects is null || _definition.ProductName is null || _definition.DefVersion is null)
             {
-                _logger.LogWarning("Failed to deserialize definitions from {StorePath}, file might be corrupt.", _definitionStorePath);
+                _logger.LogWarning("Failed to deserialize definitions from {StorePath}, file might be corrupt or incomplete.", _definitionStorePath);
                 _definition = new EcuDefinition("Store", "Not Initialized", "0", "", new Dictionary<ushort, EcuObjectDefinition>());
             }
             else
@@ -66,7 +68,7 @@ public class EcuDefinitionService : IEcuDefinitionService
         try
         {
             var objects = new Dictionary<ushort, EcuObjectDefinition>();
-            
+
             var fileContent = await File.ReadAllTextAsync(xmlFilePath, cancellationToken);
             var startIndex = fileContent.IndexOf("<ecu>", StringComparison.OrdinalIgnoreCase);
             var endIndex = fileContent.LastIndexOf("</ecu>", StringComparison.OrdinalIgnoreCase);
@@ -99,7 +101,7 @@ public class EcuDefinitionService : IEcuDefinitionService
                     );
                 }
             }
-            
+
             var drivers = doc.Root?.Element("drivers")?.Elements("DriverModel") ?? [];
             foreach (var element in drivers)
             {
@@ -113,7 +115,7 @@ public class EcuDefinitionService : IEcuDefinitionService
                     );
                 }
             }
-            
+
             var tables = doc.Root?.Element("tables")?.Elements("TableModel") ?? [];
             foreach (var element in tables)
             {
@@ -127,9 +129,9 @@ public class EcuDefinitionService : IEcuDefinitionService
                     );
                 }
             }
-            
+
             _definition = new EcuDefinition(productName, modelName, version, defVersion, objects);
-            
+
             await using var writeStream = new FileStream(_definitionStorePath, FileMode.Create, FileAccess.Write, FileShare.None, 4096, useAsync: true);
             await JsonSerializer.SerializeAsync(writeStream, _definition, new JsonSerializerOptions { WriteIndented = true }, cancellationToken);
             _logger.LogInformation("Successfully merged and stored new definition from {XmlFilePath}", xmlFilePath);

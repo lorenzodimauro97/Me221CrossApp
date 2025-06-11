@@ -27,20 +27,20 @@
                     IsLoading="_isLoading"
                     @bind-SelectedUsbDevice="SelectedUsbDevice"
                     @bind-SimulatorIp="SimulatorIp"
-                    OnConnect="Connect"/>
+                    OnConnect="Connect" />
 }
 else
 {
     <DashboardView EcuInfo="ConnState.EcuInfo"
                    RealtimeData="_realtimeData"
                    IsLoading="_isLoading"
-                   OnDisconnect="Disconnect"/>
+                   OnDisconnect="Disconnect" />
 }
 
 
 @code {
     private IReadOnlyList<DiscoveredDevice> _usbDevices = [];
-    private string? SelectedUsbDevice { get; set; }
+    private string? SelectedUsbDevice { get; set; } = "";
     private string SimulatorIp { get; set; } = "127.0.0.1:54321";
     private bool IsDevelopment { get; set; }
 
@@ -124,7 +124,7 @@ else
             {
                 throw new InvalidOperationException("Failed to retrieve ECU information.");
             }
-            
+
             Logger.LogInformation("Successfully connected to ECU {ProductName} on firmware {FirmwareVersion}", ecuInfo.ProductName, ecuInfo.FirmwareVersion);
             ConnState.SetConnectionState(true, ecuInfo, type);
 
