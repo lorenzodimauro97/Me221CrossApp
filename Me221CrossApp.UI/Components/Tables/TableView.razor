@@ -2,11 +2,11 @@
 {
     @if (Table.Rows > 1)
     {
-        <TableView3D Table="Table" />
+        <TableView3D Table="Table" TableChanged="TableChanged" />
     }
     else
     {
-        <TableView2D Table="Table" />
+        <TableView2D Table="Table" TableChanged="TableChanged" />
     }
 }
 else
@@ -17,4 +17,7 @@ else
 @code {
     [Parameter]
     public TableData? Table { get; set; }
+
+    [Parameter]
+    public EventCallback<TableData> TableChanged { get; set; }
 }

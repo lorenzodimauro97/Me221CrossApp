@@ -1,4 +1,6 @@
-﻿<div class="table-3d-controls">
+﻿@using System.Globalization
+
+<div class="table-3d-controls">
     <div class="control-group">
         <label>X-Axis Rotation: @_rotationX°</label>
         <input type="range" min="-90" max="90" class="ui-slider" @bind="_rotationX" @bind:event="oninput" />
@@ -24,13 +26,20 @@
             <tbody>
                 @for (var i = 0; i < Table.Rows; i++)
                 {
+                    var rowIndex = i;
                     <tr>
-                        <th>@Table.YAxis[i].ToString("F0")</th>
+                        <th>@Table.YAxis[rowIndex].ToString("F0")</th>
                         @for (var j = 0; j < Table.Cols; j++)
                         {
-                            var val = Table.Output[i * Table.Cols + j];
+                            var colIndex = j;
+                            var index = rowIndex * Table.Cols + colIndex;
+                            var val = Table.Output[index];
                             <td style="background-color: @ColorHelper.GetColorForValue(val, _min, _max)">
-                                @val.ToString("F1")
+                                <input type="number"
+                                       step="any"
+                                       class="table-input"
+                                       value="@val.ToString("F1", CultureInfo.InvariantCulture)"
+                                       @onchange="(e) => OnValueChanged(index, e.Value)" />
                             </td>
                         }
                     </tr>
@@ -49,6 +58,9 @@
     [Parameter, EditorRequired]
     public TableData Table { get; set; } = null!;
 
+    [Parameter]
+    public EventCallback<TableData> TableChanged { get; set; }
+
     protected override void OnParametersSet()
     {
         if (Table.Output.Any())
@@ -56,5 +68,16 @@
             _min = Table.Output.Min();
             _max = Table.Output.Max();
         }
+    }
+    
+    private Task OnValueChanged(int index, object? value)
+    {
+        if (float.TryParse(value?.ToString(), NumberStyles.Any, CultureInfo.InvariantCulture, out var floatValue))
+        {
+            var newOutput = Table.Output.ToList();
+            newOutput[index] = floatValue;
+            return TableChanged.InvokeAsync(Table with { Output = newOutput });
+        }
+        return Task.CompletedTask;
     }
 }

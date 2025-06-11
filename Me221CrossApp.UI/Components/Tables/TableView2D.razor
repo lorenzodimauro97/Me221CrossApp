@@ -1,4 +1,6 @@
-﻿<div class="table-responsive">
+﻿@using System.Globalization
+
+<div class="table-responsive">
     <table class="table table-bordered table-striped table-sm text-center">
         <thead>
         <tr>
@@ -10,9 +12,16 @@
         </thead>
         <tbody>
         <tr>
-            @foreach (var val in Table.Output)
+            @for (var i = 0; i < Table.Output.Count; i++)
             {
-                <td style="background-color: @ColorHelper.GetColorForValue(val, _min, _max)">@val.ToString("F2")</td>
+                var index = i;
+                <td style="background-color: @ColorHelper.GetColorForValue(Table.Output[index], _min, _max)">
+                    <input type="number"
+                           step="any"
+                           class="table-input"
+                           value="@Table.Output[index].ToString("F2", CultureInfo.InvariantCulture)"
+                           @onchange="(e) => OnValueChanged(index, e.Value)" />
+                </td>
             }
         </tr>
         </tbody>
@@ -23,6 +32,9 @@
     [Parameter, EditorRequired]
     public TableData Table { get; set; } = null!;
 
+    [Parameter]
+    public EventCallback<TableData> TableChanged { get; set; }
+
     private float _min, _max;
 
     protected override void OnParametersSet()
@@ -32,5 +44,16 @@
             _min = Table.Output.Min();
             _max = Table.Output.Max();
         }
+    }
+
+    private Task OnValueChanged(int index, object? value)
+    {
+        if (float.TryParse(value?.ToString(), NumberStyles.Any, CultureInfo.InvariantCulture, out var floatValue))
+        {
+            var newOutput = Table.Output.ToList();
+            newOutput[index] = floatValue;
+            return TableChanged.InvokeAsync(Table with { Output = newOutput });
+        }
+        return Task.CompletedTask;
     }
 }

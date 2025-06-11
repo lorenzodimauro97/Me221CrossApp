@@ -8,6 +8,15 @@
 
 <h1>Table Viewer</h1>
 
+@if (!string.IsNullOrEmpty(_errorMessage))
+{
+    <div class="alert alert-danger mt-3" role="alert">@_errorMessage</div>
+}
+@if (!string.IsNullOrEmpty(_statusMessage))
+{
+    <div class="alert alert-info mt-3" role="alert">@_statusMessage</div>
+}
+
 @if (!ConnState.IsConnected)
 {
     <div class="alert alert-warning">Please connect to an ECU on the Home page to view tables.</div>
@@ -24,7 +33,7 @@ else
             else
             {
                 <div class="ui-input-group">
-                    <select @bind="SelectedTableId" class="ui-select" disabled="@_isTableLoading">
+                    <select @bind="SelectedTableId" class="ui-select" disabled="@(_isTableLoading || _isUpdating || _isStoring)">
                         <option value="0">Select a table...</option>
                         @foreach (var table in _tables)
                         {
@@ -44,11 +53,21 @@ else
             </div>
         </div>
     }
-    else
+    else if (_selectedTableData is not null)
     {
         <div class="ui-card">
             <div class="ui-card-body">
-                <TableView Table="_selectedTableData" />
+                <TableView Table="_selectedTableData" TableChanged="OnTableDataChanged" />
+            </div>
+            <div class="ui-card-footer">
+                <div class="button-group">
+                    <button class="ui-button" @onclick="UpdateTable" disabled="@(!IsTableDirty || _isUpdating || _isStoring)">
+                        @if (_isUpdating) { <span>Updating...</span> } else { <span>Update ECU</span> }
+                    </button>
+                    <button class="ui-button-secondary" @onclick="StoreTable" disabled="@(IsTableDirty || _isStoring)">
+                        @if (_isStoring) { <span>Storing...</span> } else { <span>Store to Flash</span> }
+                    </button>
+                </div>
             </div>
         </div>
     }
@@ -58,19 +77,31 @@ else
 @code {
     private bool _isLoading;
     private bool _isTableLoading;
+    private bool _isUpdating;
+    private bool _isStoring;
+    private string? _statusMessage;
+    private string? _errorMessage;
+
     private IReadOnlyList<EcuObjectDefinition> _tables = [];
     private TableData? _selectedTableData;
-    
+    private TableData? _originalTableData;
+
     private ushort _selectedTableId;
     private ushort SelectedTableId
     {
         get => _selectedTableId;
         set
         {
-            _selectedTableId = value;
-            _ = LoadTableDataAsync();
+            if (_selectedTableId != value)
+            {
+                _selectedTableId = value;
+                _ = LoadTableDataAsync();
+            }
         }
     }
+
+    private bool IsTableDirty => _originalTableData != null && _selectedTableData != null &&
+                                 !_originalTableData.Output.SequenceEqual(_selectedTableData.Output);
 
     protected override async Task OnInitializedAsync()
     {
@@ -85,6 +116,7 @@ else
             catch (Exception ex)
             {
                 Logger.LogError(ex, "Failed to load object list for tables.");
+                _errorMessage = "Failed to load table list.";
             }
             finally
             {
@@ -95,27 +127,102 @@ else
 
     private async Task LoadTableDataAsync()
     {
+        _statusMessage = null;
+        _errorMessage = null;
+
         if (SelectedTableId == 0)
         {
             _selectedTableData = null;
+            _originalTableData = null;
             return;
         }
 
         _isTableLoading = true;
         _selectedTableData = null;
+        _originalTableData = null;
         await InvokeAsync(StateHasChanged);
 
         try
         {
             _selectedTableData = await EcuService.GetTableAsync(SelectedTableId);
+            _originalTableData = _selectedTableData;
         }
         catch (Exception ex)
         {
             Logger.LogError(ex, "Failed to load data for table {TableId}", SelectedTableId);
+            _errorMessage = $"Failed to load data for table {SelectedTableId}.";
         }
         finally
         {
             _isTableLoading = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private void OnTableDataChanged(TableData newTableData)
+    {
+        _selectedTableData = newTableData;
+        StateHasChanged();
+    }
+
+    private async Task UpdateTable()
+    {
+        if (_selectedTableData is null || !IsTableDirty) return;
+
+        _isUpdating = true;
+        _statusMessage = "Updating table on ECU...";
+        _errorMessage = null;
+        await InvokeAsync(StateHasChanged);
+
+        try
+        {
+            await EcuService.UpdateTableAsync(_selectedTableData);
+            _originalTableData = _selectedTableData;
+            _statusMessage = "Table updated successfully.";
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to update table {TableId}", _selectedTableData.Id);
+            _errorMessage = $"Failed to update table: {ex.Message}";
+            _statusMessage = null;
+        }
+        finally
+        {
+            _isUpdating = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private async Task StoreTable()
+    {
+        if (_selectedTableData is null) return;
+
+        if (IsTableDirty)
+        {
+            _errorMessage = "There are unsaved changes. Please 'Update ECU' before storing to flash.";
+            _statusMessage = null;
+            return;
+        }
+
+        _isStoring = true;
+        _statusMessage = "Storing table to ECU flash...";
+        _errorMessage = null;
+        await InvokeAsync(StateHasChanged);
+
+        try
+        {
+            await EcuService.StoreTableAsync(_selectedTableData.Id);
+            _statusMessage = "Table successfully stored to flash.";
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to store table {TableId}", _selectedTableData.Id);
+            _errorMessage = $"Failed to store table: {ex.Message}";
+            _statusMessage = null;
+        }
+        finally
+        {
+            _isStoring = false;
             await InvokeAsync(StateHasChanged);
         }
     }

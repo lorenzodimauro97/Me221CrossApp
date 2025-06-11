@@ -23,7 +23,7 @@
 
 .table-3d th, .table-3d td {
     border: 1px solid rgba(255, 255, 255, 0.2);
-    padding: 0.5rem;
+    padding: 0;
     text-align: center;
     min-width: 50px;
     background-color: var(--app-bg-alt-color); /* Fallback */
@@ -33,6 +33,7 @@
 .table-3d th {
     background-color: #373a40;
     font-weight: bold;
+    padding: 0.5rem;
 }
 
 .table-3d td:hover {
@@ -60,4 +61,27 @@
 
 .ui-slider {
     width: 200px;
+}
+
+.table-input {
+    width: 100%;
+    background-color: transparent;
+    border: none;
+    color: #ffffff;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.7);
+    text-align: center;
+    font-size: inherit;
+    padding: 0.5rem;
+    -moz-appearance: textfield;
+}
+
+.table-input:focus {
+    outline: 1px solid var(--accent-color);
+    background-color: rgba(0, 0, 0, 0.2);
+}
+
+.table-input::-webkit-outer-spin-button,
+.table-input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
 }
