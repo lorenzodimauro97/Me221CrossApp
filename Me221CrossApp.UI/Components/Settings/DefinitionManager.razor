@@ -69,10 +69,10 @@
             var customFileType = new FilePickerFileType(
                 new Dictionary<DevicePlatform, IEnumerable<string>>
                 {
-                    { DevicePlatform.WinUI, new[] { ".mefw", ".xml" } },
-                    { DevicePlatform.Android, new[] { "application/xml", "text/xml" } },
-                    { DevicePlatform.iOS, new[] { "public.xml" } },
-                    { DevicePlatform.MacCatalyst, new[] { "public.xml" } },
+                    { DevicePlatform.WinUI, [".mefw", ".xml"] },
+                    { DevicePlatform.Android, ["*/*"] },
+                    { DevicePlatform.iOS, ["public.xml", "public.data"] },
+                    { DevicePlatform.MacCatalyst, ["public.xml", "public.data"] },
                 });
             
             var result = await FilePicker.Default.PickAsync(new PickOptions
