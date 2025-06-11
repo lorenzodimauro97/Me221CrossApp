@@ -25,7 +25,9 @@
         <ApplicationTitle>ME221CrossApp.UI</ApplicationTitle>
 
         <!-- App Identifier -->
-        <ApplicationId>com.companyname.me221crossapp.ui</ApplicationId>
+        <ApplicationId>com.scippo97productions.me221.app</ApplicationId>
+
+        <RuntimeIdentifiers Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">android-arm;android-arm64;android-x86;android-x64</RuntimeIdentifiers>
 
         <!-- Versions -->
         <ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>

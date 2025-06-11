@@ -2,5 +2,5 @@
 
 internal static class UsbConstants
 {
-    public const string ActionUsbPermission = "com.companyname.me221crossapp.ui.USB_PERMISSION";
+    public const string ActionUsbPermission = "com.scippo97productions.me221.app.USB_PERMISSION";
 }
