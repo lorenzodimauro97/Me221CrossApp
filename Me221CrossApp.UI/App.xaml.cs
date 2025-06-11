@@ -9,7 +9,7 @@
 
         protected override Window CreateWindow(IActivationState? activationState)
         {
-            return new Window(new MainPage()) { Title = "ME221CrossApp.UI" };
+            return new Window(new MainPage()) { Title = "ME Cross App" };
         }
     }
 }
