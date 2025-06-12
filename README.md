@@ -8,11 +8,11 @@ A modern, cross-platform .NET 10 application for interacting with ME221/ME442 En
 - [Features](#features)
 - [Project Structure](#project-structure)
 - [Getting Started](#getting-started)
-  - [Prerequisites](#prerequisites)
-  - [Building](#building)
+    - [Prerequisites](#prerequisites)
+    - [Building](#building)
 - [Running the Application](#running-the-application)
-  - [1. ECU Simulator](#1-ecu-simulator)
-  - [2. MAUI UI Application](#2-maui-ui-application)
+    - [1. ECU Simulator](#1-ecu-simulator)
+    - [2. MAUI UI Application](#2-maui-ui-application)
 - [Usage Workflow](#usage-workflow)
 - [Architectural Highlights](#architectural-highlights)
 
@@ -35,6 +35,23 @@ This project is built on the cutting edge of the .NET ecosystem, prioritizing pe
 - **Table Editing**: View and modify 2D and 3D tuning tables (e.g., VE, Ignition) with a color-scaled, interactive UI.
 - **Driver Configuration**: Read and write driver parameters.
 - **Decoupled Architecture**: Clean separation between UI, business logic, and communication layers.
+
+## ⚠️ Important Warning for Android Smartphone users
+
+**Do not connect your Android phone or any USB-C device directly to the ECU using a standard USB cable.**
+
+It has been reported that some ECUs (including certain ME442 models) do not adhere to the USB specification and may provide 5V power on the VBUS pin. A standard USB-C to USB-A/B cable will carry this power. If your phone detects this, it may attempt to draw power from the ECU, which is not designed to be a charging source and could potentially damage your phone or the ECU.
+
+This issue has not been reported when using devices such as Android Radio Headsets, but caution is advised.
+
+**Solution:**
+
+To connect safely, you must use a method that prevents power transfer from the ECU to your phone. The recommended approach is to use one of the following:
+
+-   A **USB data-only adapter** (sometimes called a "USB data blocker"). These are small adapters that pass through the data lines but physically disconnect the power lines.
+-   A modified USB cable where the 5V power wire has been intentionally disconnected.
+
+Failure to do so could result in irreversible damage to your device.
 
 ## Project Structure
 
