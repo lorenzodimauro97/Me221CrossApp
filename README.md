@@ -44,14 +44,17 @@ It has been reported that some ECUs (including certain ME442 models) do not adhe
 
 This issue has not been reported when using devices such as Android Radio Headsets, but caution is advised.
 
+A standard "USB data blocker" is **NOT** a solution. These devices block the data lines to prevent malicious data access, which would also prevent communication with the ECU.
+
 **Solution:**
 
-To connect safely, you must use a method that prevents power transfer from the ECU to your phone. The recommended approach is to use one of the following:
+To connect safely, you must use a method that **blocks power transfer** from the ECU to your phone while keeping the data lines connected.
 
--   A **USB data-only adapter** (sometimes called a "USB data blocker"). These are small adapters that pass through the data lines but physically disconnect the power lines.
--   A modified USB cable where the 5V power wire has been intentionally disconnected.
+The recommended approach is to use one of the following:
+-   An inline **USB power-blocking adapter** that specifically disconnects the VBUS (5V power) line.
+-   A modified USB cable where the 5V power wire (typically the red wire) has been intentionally and safely disconnected.
 
-Failure to do so could result in irreversible damage to your device.
+Failure to use a power-blocking solution could result in irreversible damage to your device.
 
 ## Project Structure
 
