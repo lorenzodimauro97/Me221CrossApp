@@ -1,12 +1,9 @@
 ﻿@page "/tables"
-@using ME221CrossApp.UI.Components.Tables
 @inject ConnectionStateService ConnState
 @inject IEcuInteractionService EcuService
 @inject ILogger<Tables> Logger
 
 <PageTitle>Table Viewer</PageTitle>
-
-<h1>Table Viewer</h1>
 
 @if (!string.IsNullOrEmpty(_errorMessage))
 {

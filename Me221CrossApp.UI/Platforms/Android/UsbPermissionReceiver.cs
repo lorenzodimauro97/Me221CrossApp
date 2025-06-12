@@ -1,5 +1,4 @@
-﻿using Android.App;
-using Android.Content;
+﻿using Android.Content;
 using Android.Hardware.Usb;
 
 namespace Me221CrossApp.UI.Services;

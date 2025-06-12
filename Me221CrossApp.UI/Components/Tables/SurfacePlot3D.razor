@@ -1,0 +1,90 @@
+﻿@inject IJSRuntime JSRuntime
+@implements IAsyncDisposable
+
+<div @ref="_plotElement" id="@_elementId" style="width: 100%; height: 500px;"></div>
+
+@code {
+    private readonly string _elementId = $"plot-{Guid.NewGuid():N}";
+    private ElementReference _plotElement;
+    private IJSObjectReference? _plotModule;
+    private bool _hasRendered;
+
+    [Parameter, EditorRequired]
+    public TableData Table { get; set; } = null!;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _plotModule = await JSRuntime.InvokeAsync<IJSObjectReference>("import", "./js/surface-plot-interop.js");
+            await CreatePlot();
+            _hasRendered = true;
+        }
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_hasRendered && _plotModule is not null)
+        {
+            await UpdatePlot();
+        }
+    }
+
+    private object GetPlotDataForCreate()
+    {
+        return new
+        {
+            z = GetZData(),
+            x = Table.XAxis,
+            y = Table.YAxis,
+            title = Table.Name
+        };
+    }
+
+    private object GetPlotDataForUpdate()
+    {
+        return new
+        {
+            z = GetZData()
+        };
+    }
+
+    private float[][] GetZData()
+    {
+        var zData = new float[Table.Rows][];
+        for (var r = 0; r < Table.Rows; r++)
+        {
+            zData[r] = new float[Table.Cols];
+            for (var c = 0; c < Table.Cols; c++)
+            {
+                zData[r][c] = Table.Output[r * Table.Cols + c];
+            }
+        }
+        return zData;
+    }
+
+    private async Task CreatePlot()
+    {
+        if (_plotModule is not null)
+        {
+            await _plotModule.InvokeVoidAsync("createPlot", _elementId, GetPlotDataForCreate());
+        }
+    }
+
+    private async Task UpdatePlot()
+    {
+        if (_plotModule is not null)
+        {
+            await _plotModule.InvokeVoidAsync("updatePlot", _elementId, GetPlotDataForUpdate());
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_plotModule is not null)
+        {
+            await _plotModule.InvokeVoidAsync("destroyPlot", _elementId);
+            await _plotModule.DisposeAsync();
+        }
+    }
+}

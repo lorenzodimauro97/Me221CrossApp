@@ -7,7 +7,6 @@ using ME221CrossApp.Models;
 using ME221CrossApp.Services;
 using ME221CrossApp.Services.Helpers;
 using Microsoft.Extensions.Logging;
-using Microsoft.Maui.ApplicationModel;
 using Application = Android.App.Application;
 
 namespace Me221CrossApp.UI.Services;
