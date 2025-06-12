@@ -105,4 +105,8 @@
       </Content>
     </ItemGroup>
 
+    <ItemGroup>
+      <RazorComponent Include="Components\Shared\LineChart.razor.css" />
+    </ItemGroup>
+
 </Project>

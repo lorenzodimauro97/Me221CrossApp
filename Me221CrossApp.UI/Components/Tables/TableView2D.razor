@@ -1,32 +1,38 @@
 ﻿@using System.Globalization
+@using Microsoft.Maui.Graphics
 
-<div class="table-responsive">
-    <table class="table table-bordered table-striped table-sm text-center">
-        <thead>
-        <tr>
-            @foreach (var x in Table.XAxis)
-            {
-                <th>@x.ToString("F1")</th>
-            }
-        </tr>
-        </thead>
-        <tbody>
-        <tr>
-            @for (var i = 0; i < Table.Output.Count; i++)
-            {
-                var index = i;
-                <td style="background-color: @ColorHelper.GetColorForValue(Table.Output[index], _min, _max)">
-                    <input type="number"
-                           step="any"
-                           class="table-input"
-                           value="@Table.Output[index].ToString("F2", CultureInfo.InvariantCulture)"
-                           @onchange="(e) => OnValueChanged(index, e.Value)" />
-                </td>
-            }
-        </tr>
-        </tbody>
-    </table>
+<div class="table-view-2d-container">
+    <div class="table-responsive">
+        <table class="table table-bordered table-striped table-sm text-center">
+            <thead>
+                <tr>
+                    <th>X-Axis</th>
+                    <th>Value</th>
+                </tr>
+            </thead>
+            <tbody>
+                @for (var i = 0; i < Table.Output.Count; i++)
+                {
+                    var index = i;
+                    <tr>
+                        <td>@Table.XAxis[index].ToString("F1")</td>
+                        <td style="background-color: @ColorHelper.GetColorForValue(Table.Output[index], _min, _max)">
+                            <input type="number"
+                                   step="any"
+                                   class="table-input"
+                                   value="@Table.Output[index].ToString("F2", CultureInfo.InvariantCulture)"
+                                   @onchange="(e) => OnValueChanged(index, e.Value)" />
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+    <div class="chart-area">
+        <LineChart DataPoints="_chartData" XAxisLabel="X-Axis" YAxisLabel="@Table.Name" />
+    </div>
 </div>
+
 
 @code {
     [Parameter, EditorRequired]
@@ -36,6 +42,7 @@
     public EventCallback<TableData> TableChanged { get; set; }
 
     private float _min, _max;
+    private IReadOnlyList<PointF> _chartData = [];
 
     protected override void OnParametersSet()
     {
@@ -43,6 +50,17 @@
         {
             _min = Table.Output.Min();
             _max = Table.Output.Max();
+        }
+
+        if (Table.XAxis.Any() && Table.Output.Any() && Table.XAxis.Count == Table.Output.Count)
+        {
+            _chartData = Table.XAxis
+                .Zip(Table.Output, (x, y) => new PointF(x, y))
+                .ToList();
+        }
+        else
+        {
+            _chartData = [];
         }
     }
 

@@ -1,4 +1,22 @@
-﻿.table-input {
+﻿.table-view-2d-container {
+    display: flex;
+    flex-direction: row;
+    gap: 1rem;
+    width: 100%;
+}
+
+.table-responsive {
+    flex: 0 0 250px;
+    overflow-y: auto;
+    max-height: 500px;
+}
+
+.chart-area {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.table-input {
     width: 100%;
     background-color: transparent;
     border: none;

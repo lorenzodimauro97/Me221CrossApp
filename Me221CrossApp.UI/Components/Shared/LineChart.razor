@@ -1,0 +1,70 @@
+﻿@inject IJSRuntime JSRuntime
+@implements IAsyncDisposable
+
+<div @ref="_chartElement" id="@_elementId" style="width: 100%; height: 100%; min-height: 400px;"></div>
+
+@code {
+    private readonly string _elementId = $"chart-{Guid.NewGuid():N}";
+    private ElementReference _chartElement;
+    private IJSObjectReference? _chartModule;
+    private bool _hasRendered;
+
+    [Parameter, EditorRequired]
+    public IReadOnlyList<PointF> DataPoints { get; set; } = [];
+
+    [Parameter]
+    public string? XAxisLabel { get; set; }
+
+    [Parameter]
+    public string? YAxisLabel { get; set; }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _chartModule = await JSRuntime.InvokeAsync<IJSObjectReference>("import", "./js/chart-interop.js");
+            await CreateChart();
+            _hasRendered = true;
+        }
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_hasRendered && _chartModule is not null)
+        {
+            await UpdateChart();
+        }
+    }
+
+    private async Task CreateChart()
+    {
+        if (_chartModule is not null)
+        {
+            var seriesData = DataPoints.Select(p => new[] { p.X, p.Y }).ToArray();
+            await _chartModule.InvokeVoidAsync("createChart", _elementId, new
+            {
+                XAxisLabel,
+                YAxisLabel,
+                SeriesData = seriesData
+            });
+        }
+    }
+
+    private async Task UpdateChart()
+    {
+        if (_chartModule is not null)
+        {
+            var seriesData = DataPoints.Select(p => new[] { p.X, p.Y }).ToArray();
+            await _chartModule.InvokeVoidAsync("updateChart", _elementId, seriesData);
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_chartModule is not null)
+        {
+            await _chartModule.InvokeVoidAsync("destroyChart", _elementId);
+            await _chartModule.DisposeAsync();
+        }
+    }
+}
