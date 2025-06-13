@@ -57,9 +57,12 @@ public class SimulatedEcuStateService(IEcuDefinitionService definitionService, I
                     _tables[ecuObject.Id] = new TableData(ecuObject.Id, ecuObject.Name, 0, true, rows, cols, xAxis, yAxis, output);
                     break;
                 case "Driver":
-                    var configParams = Enumerable.Range(0, 8).Select(i => (float)(i * 1.5)).ToList();
-                    var inputIds = Enumerable.Range(1, 4).Select(i => (ushort)i).ToList();
-                    var outputIds = Enumerable.Range(10, 4).Select(i => (ushort)i).ToList();
+                    var numConfigs = ecuObject.Parameters?.Count ?? 0;
+                    var configParams = Enumerable.Range(0, numConfigs).Select(i => (float)(i * 1.5)).ToList();
+                    var numInputs = ecuObject.InputLinks?.Names.Count ?? 0;
+                    var inputIds = Enumerable.Range(1, numInputs).Select(i => (ushort)i).ToList();
+                    var numOutputs = ecuObject.OutputLinks?.Names.Count ?? 0;
+                    var outputIds = Enumerable.Range(10, numOutputs).Select(i => (ushort)i).ToList();
                     _drivers[ecuObject.Id] = new DriverData(ecuObject.Id, ecuObject.Name, 
                         configParams, inputIds, outputIds);
                     break;

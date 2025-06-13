@@ -7,7 +7,7 @@ public interface IEcuInteractionService
 {
     Task<EcuInfo?> GetEcuInfoAsync(CancellationToken cancellationToken = default);
     Task<IReadOnlyList<EcuObjectDefinition>> GetObjectListAsync(CancellationToken cancellationToken = default);
-    Task<IReadOnlyList<EcuObjectDefinition>> GetDataLinkListAsync(CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<EcuObjectDefinition>> GetDataLinkListAsync(bool keepStreamActive = false, CancellationToken cancellationToken = default);
     Task<RealtimeDataPoint?> GetRealtimeDataValueAsync(ushort dataLinkId, CancellationToken cancellationToken = default);
     Task<TableData?> GetTableAsync(ushort tableId, CancellationToken cancellationToken = default);
     Task<DriverData?> GetDriverAsync(ushort driverId, CancellationToken cancellationToken = default);

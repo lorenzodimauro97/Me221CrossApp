@@ -16,6 +16,13 @@
             <span>Tables</span>
         }
     </NavLink>
+    <NavLink class="nav-item" href="drivers">
+        <TablerIcon OutlineIcon="TablerIconOutlineName.SteeringWheel" Size="40px" />
+        @if (IsMobile)
+        {
+            <span>Drivers</span>
+        }
+    </NavLink>
     
     @foreach (var view in _customViews.OrderBy(v => v.Name))
     {

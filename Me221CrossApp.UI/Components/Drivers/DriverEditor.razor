@@ -1,0 +1,232 @@
+﻿@using System.Globalization
+@using System.ComponentModel
+
+@if (Driver is not null && Definition?.Parameters is not null)
+{
+    <div class="driver-editor-grid">
+        <div class="driver-editor-section">
+            <h5 class="section-title">Configuration Parameters</h5>
+            <div class="param-list">
+                @foreach (var (paramDef, index) in Definition.Parameters.Select((p, i) => (p, i)))
+                {
+                    if (IsVisible(paramDef) && index < Driver.ConfigParams.Count)
+                    {
+                        if (!string.IsNullOrEmpty(paramDef.SectionName) && (index == 0 || Definition.Parameters[index - 1].SectionName != paramDef.SectionName))
+                        {
+                            <h6 class="param-section-header">@paramDef.SectionName</h6>
+                        }
+                        <div class="param-item" title="@paramDef.ToolTipText">
+                            <label class="param-label" for="param-@index">@(paramDef.DisplayName ?? paramDef.Name)</label>
+                            @switch (paramDef.Type)
+                            {
+                                case DriverParameterType.InputBox:
+                                    <input type="number"
+                                           id="param-@index"
+                                           step="any"
+                                           min="@paramDef.MinValue"
+                                           max="@paramDef.MaxValue"
+                                           class="ui-input param-input"
+                                           disabled="@paramDef.IsReadOnly"
+                                           value="@Driver.ConfigParams[index].ToString(CultureInfo.InvariantCulture)"
+                                           @onchange="(e) => OnConfigParamChanged(index, e.Value)" />
+                                    break;
+                                case DriverParameterType.ComboBox:
+                                    <select id="param-@index" class="ui-select" 
+                                            disabled="@paramDef.IsReadOnly"
+                                            value="@Driver.ConfigParams[index]" 
+                                            @onchange="(e) => OnConfigParamChanged(index, e.Value)">
+                                        @if (paramDef.Options is not null)
+                                        {
+                                            @foreach (var option in paramDef.Options)
+                                            {
+                                                <option value="@option.Id">@option.Name</option>
+                                            }
+                                        }
+                                    </select>
+                                    break;
+                            }
+                        </div>
+                    }
+                }
+            </div>
+        </div>
+
+        @if (Definition.InputLinks is { IsEditable: true, Names.Count: > 0 })
+        {
+            <div class="driver-editor-section">
+                <h5 class="section-title">Input Links</h5>
+                <div class="param-list">
+                    @for (var i = 0; i < Definition.InputLinks.Names.Count; i++)
+                    {
+                        var index = i;
+                        if (index < Driver.InputLinkIds.Count)
+                        {
+                            <div class="param-item">
+                                <label class="param-label">@Definition.InputLinks.Names[index]</label>
+                                <select class="ui-select" value="@Driver.InputLinkIds[index]" @onchange="(e) => OnInputLinkChanged(index, e.Value)">
+                                    <option value="0">None</option>
+                                    @foreach (var dataLink in DataLinks.OrderBy(d => d.Name))
+                                    {
+                                        <option value="@dataLink.Id">@dataLink.Name</option>
+                                    }
+                                </select>
+                            </div>
+                        }
+                    }
+                </div>
+            </div>
+        }
+        
+        @if (Definition.OutputLinks is { IsEditable: true, Names.Count: > 0 })
+        {
+            <div class="driver-editor-section">
+                <h5 class="section-title">Output Links</h5>
+                <div class="param-list">
+                    @for (var i = 0; i < Definition.OutputLinks.Names.Count; i++)
+                    {
+                        var index = i;
+                        if (index < Driver.OutputLinkIds.Count)
+                        {
+                            <div class="param-item">
+                                <label class="param-label">@Definition.OutputLinks.Names[index]</label>
+                                <select class="ui-select" value="@Driver.OutputLinkIds[index]" @onchange="(e) => OnOutputLinkChanged(index, e.Value)">
+                                    <option value="0">None</option>
+                                    @foreach (var dataLink in DataLinks.OrderBy(d => d.Name))
+                                    {
+                                        <option value="@dataLink.Id">@dataLink.Name</option>
+                                    }
+                                </select>
+                            </div>
+                        }
+                    }
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired]
+    public DriverData Driver { get; set; } = null!;
+
+    [Parameter, EditorRequired]
+    public EcuObjectDefinition Definition { get; set; } = null!;
+
+    [Parameter]
+    public EventCallback<DriverData> DriverChanged { get; set; }
+
+    [Parameter, EditorRequired]
+    public IReadOnlyList<EcuObjectDefinition> DataLinks { get; set; } = [];
+
+    private Task OnConfigParamChanged(int index, object? value)
+    {
+        if (float.TryParse(value?.ToString(), NumberStyles.Any, CultureInfo.InvariantCulture, out var floatValue))
+        {
+            var newConfig = Driver.ConfigParams.ToList();
+            newConfig[index] = floatValue;
+            return DriverChanged.InvokeAsync(Driver with { ConfigParams = newConfig });
+        }
+        return Task.CompletedTask;
+    }
+
+    private Task OnInputLinkChanged(int index, object? value)
+    {
+        if (ushort.TryParse(value?.ToString(), out var ushortValue))
+        {
+            var newLinks = Driver.InputLinkIds.ToList();
+            newLinks[index] = ushortValue;
+            return DriverChanged.InvokeAsync(Driver with { InputLinkIds = newLinks });
+        }
+        return Task.CompletedTask;
+    }
+
+    private Task OnOutputLinkChanged(int index, object? value)
+    {
+        if (ushort.TryParse(value?.ToString(), out var ushortValue))
+        {
+            var newLinks = Driver.OutputLinkIds.ToList();
+            newLinks[index] = ushortValue;
+            return DriverChanged.InvokeAsync(Driver with { OutputLinkIds = newLinks });
+        }
+        return Task.CompletedTask;
+    }
+    
+    private bool IsVisible(DriverParameterDefinition paramDef)
+    {
+        if (paramDef.ViewConstraint is null || !paramDef.ViewConstraint.AcceptedValues.Any())
+        {
+            return true;
+        }
+
+        var sourceParamIndex = paramDef.ViewConstraint.ParamIndex;
+        if (sourceParamIndex < 0 || sourceParamIndex >= Driver.ConfigParams.Count)
+        {
+            return false;
+        }
+
+        var sourceValue = Driver.ConfigParams[sourceParamIndex];
+        return paramDef.ViewConstraint.AcceptedValues.Contains(sourceValue);
+    }
+}
+
+<style>
+    .driver-editor-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 1.5rem;
+    }
+
+    .driver-editor-section {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .section-title {
+        font-size: 1.1rem;
+        font-weight: 600;
+        border-bottom: 1px solid var(--border-color);
+        padding-bottom: 0.5rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .param-section-header {
+        font-size: 1rem;
+        font-weight: 500;
+        color: var(--text-color-secondary);
+        margin-top: 1rem;
+        margin-bottom: -0.25rem;
+        padding-left: 0.25rem;
+    }
+
+    .param-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+
+    .param-item {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        align-items: center;
+        gap: 1rem;
+    }
+
+    .param-label {
+        font-size: 0.9rem;
+        color: var(--text-color-secondary);
+        text-align: right;
+        white-space: nowrap;
+    }
+
+    .param-input {
+        text-align: right;
+    }
+
+    .param-item > .ui-input,
+    .param-item > .ui-select {
+        width: 100%;
+        min-width: 0;
+        box-sizing: border-box;
+    }
+</style>

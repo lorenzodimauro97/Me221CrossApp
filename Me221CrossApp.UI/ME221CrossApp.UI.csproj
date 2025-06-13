@@ -103,12 +103,6 @@
       <Content Update="Components\Tables\TableView3D.razor.css">
         <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
       </Content>
-      <Content Update="Components\Drivers\DriverView.razor.css">
-        <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
-      </Content>
-      <Content Update="Components\Views\CustomViewManager.razor.css">
-        <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
-      </Content>
     </ItemGroup>
 
     <ItemGroup>

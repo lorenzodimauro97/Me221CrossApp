@@ -1,24 +1,70 @@
-﻿@if (Driver is not null)
+﻿@inject IEcuDefinitionService DefinitionService
+
+@if (Driver is not null && Definition is not null)
 {
     <div class="ui-card">
         <div class="ui-card-header">
-            Driver: @Driver.Name (@Driver.Id)
+            Driver: @Definition.Name (@Definition.Id)
         </div>
-        <div class="ui-card-body">
-            <div class="driver-details-grid">
-                <div class="detail-item">
-                    <span class="detail-label">Config Params</span>
-                    <span class="detail-value">@Driver.ConfigParams.Count</span>
+        <div class="ui-card-body driver-view-grid">
+            @if (Definition.Parameters?.Any() == true)
+            {
+                <div class="driver-view-section">
+                    <h5 class="section-title">Configuration Parameters</h5>
+                    <div class="param-list-view">
+                        @for (var i = 0; i < Definition.Parameters.Count; i++)
+                        {
+                            if (i < Driver.ConfigParams.Count)
+                            {
+                                var paramDef = Definition.Parameters[i];
+                                var paramValue = Driver.ConfigParams[i];
+                                <div class="param-item-view">
+                                    <span class="param-label-view">@(paramDef.DisplayName ?? paramDef.Name)</span>
+                                    <span class="param-value-view">@GetParamDisplayValue(paramDef, paramValue)</span>
+                                </div>
+                            }
+                        }
+                    </div>
                 </div>
-                <div class="detail-item">
-                    <span class="detail-label">Input Links</span>
-                    <span class="detail-value">@Driver.InputLinkIds.Count</span>
+            }
+
+            @if (Definition.InputLinks?.Names.Any() == true)
+            {
+                <div class="driver-view-section">
+                    <h5 class="section-title">Input Links</h5>
+                    <div class="param-list-view">
+                        @for (var i = 0; i < Definition.InputLinks.Names.Count; i++)
+                        {
+                            if (i < Driver.InputLinkIds.Count)
+                            {
+                                <div class="param-item-view">
+                                    <span class="param-label-view">@Definition.InputLinks.Names[i]</span>
+                                    <span class="param-value-view">@GetDataLinkName(Driver.InputLinkIds[i])</span>
+                                </div>
+                            }
+                        }
+                    </div>
                 </div>
-                <div class="detail-item">
-                    <span class="detail-label">Output Links</span>
-                    <span class="detail-value">@Driver.OutputLinkIds.Count</span>
+            }
+
+            @if (Definition.OutputLinks?.Names.Any() == true)
+            {
+                <div class="driver-view-section">
+                    <h5 class="section-title">Output Links</h5>
+                    <div class="param-list-view">
+                        @for (var i = 0; i < Definition.OutputLinks.Names.Count; i++)
+                        {
+                            if (i < Driver.OutputLinkIds.Count)
+                            {
+                                <div class="param-item-view">
+                                    <span class="param-label-view">@Definition.OutputLinks.Names[i]</span>
+                                    <span class="param-value-view">@GetDataLinkName(Driver.OutputLinkIds[i])</span>
+                                </div>
+                            }
+                        }
+                    </div>
                 </div>
-            </div>
+            }
         </div>
     </div>
 }
@@ -26,4 +72,67 @@
 @code {
     [Parameter, EditorRequired]
     public DriverData? Driver { get; set; }
+
+    private EcuObjectDefinition? Definition => Driver is not null ? (DefinitionService.TryGetObject(Driver.Id, out var def) ? def : null) : null;
+
+    private string GetDataLinkName(ushort id)
+    {
+        if (id == 0) return "None";
+        return DefinitionService.TryGetObject(id, out var def) && def is not null ? def.Name : $"ID {id}";
+    }
+
+    private string GetParamDisplayValue(DriverParameterDefinition paramDef, float value)
+    {
+        if (paramDef.Type == DriverParameterType.ComboBox)
+        {
+            return paramDef.Options?.FirstOrDefault(o => o.Id == (ushort)value)?.Name ?? "Unknown";
+        }
+        return value.ToString("F2");
+    }
 }
+
+<style>
+    .driver-view-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 1.5rem;
+        padding: 1rem;
+    }
+
+    .driver-view-section {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        background-color: var(--app-bg-alt-color);
+        padding: 1rem;
+        border-radius: var(--radius-md);
+    }
+
+    .section-title {
+        font-size: 1.1rem;
+        font-weight: 600;
+        border-bottom: 1px solid var(--border-color);
+        padding-bottom: 0.5rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .param-list-view {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .param-item-view {
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.9rem;
+    }
+
+    .param-label-view {
+        color: var(--text-color-secondary);
+    }
+
+    .param-value-view {
+        font-weight: 500;
+    }
+</style>

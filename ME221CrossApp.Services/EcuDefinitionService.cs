@@ -1,4 +1,5 @@
-﻿using System.Text.Json;
+﻿using System.Globalization;
+using System.Text.Json;
 using System.Xml.Linq;
 using ME221CrossApp.Models;
 using Microsoft.Extensions.Logging;
@@ -97,7 +98,10 @@ public class EcuDefinitionService : IEcuDefinitionService
                         Category: element.Element("category")?.Value ?? "Uncategorized",
                         ObjectType: "DataLink",
                         Rows: null,
-                        Cols: null
+                        Cols: null,
+                        Parameters: null,
+                        InputLinks: null,
+                        OutputLinks: null
                     );
                 }
             }
@@ -107,13 +111,47 @@ public class EcuDefinitionService : IEcuDefinitionService
             {
                 if (ushort.TryParse(element.Element("id")?.Value, out var id))
                 {
+                    var parameters = element.Elements("configParams").Elements("DriverModelParam")
+                        .Select(p => new DriverParameterDefinition(
+                            p.Element("name")?.Value ?? string.Empty,
+                            p.Element("DisplayName")?.Value,
+                            p.Element("SectionName")?.Value,
+                            p.Element("ToolTipText")?.Value,
+                            Enum.TryParse<DriverParameterType>(p.Element("type")?.Value, true, out var pType) ? pType : DriverParameterType.InputBox,
+                            bool.TryParse(p.Element("readOnly")?.Value, out var ro) && ro,
+                            bool.TryParse(p.Element("RequiresReset")?.Value, out var rr) && rr,
+                            float.TryParse(p.Element("min")?.Value, CultureInfo.InvariantCulture, out var min) ? min : 0,
+                            float.TryParse(p.Element("max")?.Value, CultureInfo.InvariantCulture, out var max) ? max : 0,
+                            p.Element("options")?.Elements("comboBoxOption").Select(o => new ComboBoxOption(
+                                ushort.TryParse(o.Element("id")?.Value, out var oId) ? oId : (ushort)0,
+                                o.Element("name")?.Value ?? "Unnamed"
+                            )).ToList(),
+                            p.Element("ViewConstraint") != null ? new ViewConstraint(
+                                int.TryParse(p.Element("ViewConstraint")?.Element("ParamIndex")?.Value, out var pcIdx) ? pcIdx : 0,
+                                p.Element("ViewConstraint")?.Element("AcceptedValues")?.Elements("float").Select(v => float.TryParse(v.Value, CultureInfo.InvariantCulture, out var f) ? f : 0f).ToList() ?? []
+                            ) : null
+                        )).ToList();
+
+                    var inputLinks = new DriverInputOutputDefinition(
+                        bool.TryParse(element.Element("editableInputs")?.Value, out var ei) && ei,
+                        element.Element("inputNames")?.Elements("string").Select(s => s.Value).ToList() ?? []
+                    );
+
+                    var outputLinks = new DriverInputOutputDefinition(
+                        bool.TryParse(element.Element("editableOutputs")?.Value, out var eo) && eo,
+                        element.Element("outputNames")?.Elements("string").Select(s => s.Value).ToList() ?? []
+                    );
+
                     objects[id] = new EcuObjectDefinition(
                         Id: id,
                         Name: element.Element("name")?.Value ?? $"Unnamed Driver {id}",
                         Category: element.Element("category")?.Value ?? "Uncategorized",
                         ObjectType: "Driver",
                         Rows: null,
-                        Cols: null
+                        Cols: null,
+                        Parameters: parameters,
+                        InputLinks: inputLinks,
+                        OutputLinks: outputLinks
                     );
                 }
             }
@@ -135,7 +173,10 @@ public class EcuDefinitionService : IEcuDefinitionService
                         Category: element.Element("category")?.Value ?? "Uncategorized",
                         ObjectType: "Table",
                         Rows: rows,
-                        Cols: cols
+                        Cols: cols,
+                        Parameters: null,
+                        InputLinks: null,
+                        OutputLinks: null
                     );
                 }
             }

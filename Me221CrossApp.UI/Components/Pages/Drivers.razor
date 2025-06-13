@@ -1,0 +1,247 @@
+﻿@page "/drivers"
+@inject ConnectionStateService ConnState
+@inject IEcuInteractionService EcuService
+@inject IEcuDefinitionService DefinitionService
+@inject ILogger<Drivers> Logger
+
+<PageTitle>Driver Editor</PageTitle>
+
+<h1>Driver Editor</h1>
+
+@if (!string.IsNullOrEmpty(_errorMessage))
+{
+    <div class="alert alert-danger mt-3" role="alert">@_errorMessage</div>
+}
+@if (!string.IsNullOrEmpty(_statusMessage))
+{
+    <div class="alert alert-info mt-3" role="alert">@_statusMessage</div>
+}
+
+@if (!ConnState.IsConnected)
+{
+    <div class="alert alert-warning">Please connect to an ECU on the Home page to edit drivers.</div>
+}
+else
+{
+    <div class="ui-card">
+        <div class="ui-card-header">Select Driver</div>
+        <div class="ui-card-body">
+            @if (_isLoading)
+            {
+                <p><em>Loading driver list...</em></p>
+            }
+            else
+            {
+                <div class="ui-input-group">
+                    <select @bind="SelectedDriverId" class="ui-select" disabled="@(_isDriverLoading || _isUpdating || _isStoring)">
+                        <option value="0">Select a driver...</option>
+                        @foreach (var driver in _drivers)
+                        {
+                            <option value="@driver.Id">@driver.Name</option>
+                        }
+                    </select>
+                </div>
+            }
+        </div>
+    </div>
+
+    @if (_isDriverLoading)
+    {
+        <div class="ui-card">
+            <div class="ui-card-body">
+                <p><em>Loading driver data...</em></p>
+            </div>
+        </div>
+    }
+    else if (_selectedDriverData is not null && _selectedDriverDefinition is not null)
+    {
+        <div class="ui-card">
+            <div class="ui-card-body">
+                <DriverEditor Driver="_selectedDriverData" 
+                              Definition="_selectedDriverDefinition"
+                              DriverChanged="OnDriverDataChanged" 
+                              DataLinks="_dataLinks" />
+            </div>
+            <div class="ui-card-footer">
+                <div class="button-group">
+                    <button class="ui-button" @onclick="UpdateDriver" disabled="@(!IsDriverDirty || _isUpdating || _isStoring)">
+                        @if (_isUpdating) { <span>Updating...</span> } else { <span>Update ECU</span> }
+                    </button>
+                    <button class="ui-button-secondary" @onclick="StoreDriver" disabled="@(IsDriverDirty || _isStoring)">
+                        @if (_isStoring) { <span>Storing...</span> } else { <span>Store to Flash</span> }
+                    </button>
+                </div>
+            </div>
+        </div>
+    }
+}
+
+
+@code {
+    private bool _isLoading;
+    private bool _isDriverLoading;
+    private bool _isUpdating;
+    private bool _isStoring;
+    private string? _statusMessage;
+    private string? _errorMessage;
+
+    private IReadOnlyList<EcuObjectDefinition> _drivers = [];
+    private IReadOnlyList<EcuObjectDefinition> _dataLinks = [];
+    private DriverData? _selectedDriverData;
+    private EcuObjectDefinition? _selectedDriverDefinition;
+    private DriverData? _originalDriverData;
+
+    private ushort _selectedDriverId;
+    private ushort SelectedDriverId
+    {
+        get => _selectedDriverId;
+        set
+        {
+            if (_selectedDriverId != value)
+            {
+                _selectedDriverId = value;
+                _ = LoadDriverDataAsync();
+            }
+        }
+    }
+
+    private bool IsDriverDirty
+    {
+        get
+        {
+            if (_originalDriverData == null || _selectedDriverData == null) return false;
+            if (!_originalDriverData.ConfigParams.SequenceEqual(_selectedDriverData.ConfigParams)) return true;
+            if (!_originalDriverData.InputLinkIds.SequenceEqual(_selectedDriverData.InputLinkIds)) return true;
+            if (!_originalDriverData.OutputLinkIds.SequenceEqual(_selectedDriverData.OutputLinkIds)) return true;
+            return false;
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (ConnState.IsConnected)
+        {
+            _isLoading = true;
+            try
+            {
+                var allObjects = await EcuService.GetObjectListAsync();
+                _drivers = allObjects.Where(o => o.ObjectType == "Driver").OrderBy(t => t.Name).ToList();
+                _dataLinks = await EcuService.GetDataLinkListAsync();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Failed to load object lists for drivers.");
+                _errorMessage = "Failed to load driver list.";
+            }
+            finally
+            {
+                _isLoading = false;
+            }
+        }
+    }
+
+    private async Task LoadDriverDataAsync()
+    {
+        _statusMessage = null;
+        _errorMessage = null;
+
+        if (SelectedDriverId == 0)
+        {
+            _selectedDriverData = null;
+            _originalDriverData = null;
+            _selectedDriverDefinition = null;
+            return;
+        }
+
+        _isDriverLoading = true;
+        _selectedDriverData = null;
+        _originalDriverData = null;
+        _selectedDriverDefinition = null;
+        await InvokeAsync(StateHasChanged);
+
+        try
+        {
+            _selectedDriverData = await EcuService.GetDriverAsync(SelectedDriverId);
+            _originalDriverData = _selectedDriverData;
+            DefinitionService.TryGetObject(SelectedDriverId, out _selectedDriverDefinition);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load data for driver {DriverId}", SelectedDriverId);
+            _errorMessage = $"Failed to load data for driver {SelectedDriverId}.";
+        }
+        finally
+        {
+            _isDriverLoading = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private void OnDriverDataChanged(DriverData newDriverData)
+    {
+        _selectedDriverData = newDriverData;
+        StateHasChanged();
+    }
+
+    private async Task UpdateDriver()
+    {
+        if (_selectedDriverData is null || !IsDriverDirty) return;
+
+        _isUpdating = true;
+        _statusMessage = "Updating driver on ECU...";
+        _errorMessage = null;
+        await InvokeAsync(StateHasChanged);
+
+        try
+        {
+            await EcuService.UpdateDriverAsync(_selectedDriverData);
+            _originalDriverData = _selectedDriverData;
+            _statusMessage = "Driver updated successfully.";
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to update driver {DriverId}", _selectedDriverData.Id);
+            _errorMessage = $"Failed to update driver: {ex.Message}";
+            _statusMessage = null;
+        }
+        finally
+        {
+            _isUpdating = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private async Task StoreDriver()
+    {
+        if (_selectedDriverData is null) return;
+
+        if (IsDriverDirty)
+        {
+            _errorMessage = "There are unsaved changes. Please 'Update ECU' before storing to flash.";
+            _statusMessage = null;
+            return;
+        }
+
+        _isStoring = true;
+        _statusMessage = "Storing driver to ECU flash...";
+        _errorMessage = null;
+        await InvokeAsync(StateHasChanged);
+
+        try
+        {
+            await EcuService.StoreDriverAsync(_selectedDriverData.Id);
+            _statusMessage = "Driver successfully stored to flash.";
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to store driver {DriverId}", _selectedDriverData.Id);
+            _errorMessage = $"Failed to store driver: {ex.Message}";
+            _statusMessage = null;
+        }
+        finally
+        {
+            _isStoring = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+}

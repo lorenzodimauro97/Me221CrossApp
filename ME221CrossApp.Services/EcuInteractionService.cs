@@ -35,16 +35,19 @@ public class EcuInteractionService(IDeviceCommunicator communicator, IEcuDefinit
         return list;
     }
 
-    public async Task<IReadOnlyList<EcuObjectDefinition>> GetDataLinkListAsync(CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<EcuObjectDefinition>> GetDataLinkListAsync(bool keepStreamActive = false, CancellationToken cancellationToken = default)
     {
         logger.LogInformation("Requesting data link list...");
         var enableRequest = new Message(0x00, 0x00, 0x02, [1]);
         var response = await communicator.SendMessageAsync(enableRequest, TimeSpan.FromSeconds(2), cancellationToken);
         var reportingMap = EcuDataParser.ParseSetStateResponse(response.Payload);
 
-        var disableRequest = new Message(0x00, 0x00, 0x02, [0]);
-        await communicator.PostMessageAsync(disableRequest, cancellationToken);
-        await Task.Delay(100, cancellationToken);
+        if (!keepStreamActive)
+        {
+            var disableRequest = new Message(0x00, 0x00, 0x02, [0]);
+            await communicator.PostMessageAsync(disableRequest, cancellationToken);
+            await Task.Delay(100, cancellationToken);
+        }
 
         var dataLinks = new List<EcuObjectDefinition>();
         foreach (var (id, _) in reportingMap)

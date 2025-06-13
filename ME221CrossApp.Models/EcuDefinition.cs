@@ -14,5 +14,8 @@ public record EcuObjectDefinition(
     string Category,
     string ObjectType,
     byte? Rows,
-    byte? Cols
+    byte? Cols,
+    IReadOnlyList<DriverParameterDefinition>? Parameters,
+    DriverInputOutputDefinition? InputLinks,
+    DriverInputOutputDefinition? OutputLinks
 );
