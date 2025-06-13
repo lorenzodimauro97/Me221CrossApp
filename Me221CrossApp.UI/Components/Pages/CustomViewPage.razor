@@ -1,0 +1,181 @@
+﻿@page "/view/{ViewId:guid}"
+@inject ICustomViewService CustomViewService
+@inject IEcuInteractionService EcuService
+@inject ConnectionStateService ConnState
+@inject ILogger<CustomViewPage> Logger
+@implements IAsyncDisposable
+
+@if (_isLoading)
+{
+    <h1>Loading View...</h1>
+}
+else if (_viewDefinition is not null)
+{
+    <PageTitle>@_viewDefinition.Name</PageTitle>
+    <h1>@_viewDefinition.Name</h1>
+
+    @if (!ConnState.IsConnected)
+    {
+        <div class="alert alert-warning">Please connect to an ECU to see live data.</div>
+    }
+    else
+    {
+        <div class="datalink-grid">
+            @foreach (var objRef in _viewDefinition.EcuObjects.Where(o => o.ObjectType == "DataLink").OrderBy(o => o.Name))
+            {
+                @if (_realtimeData.TryGetValue(objRef.Id, out var dp))
+                {
+                    <DataLinkCard DataPoint="dp"/>
+                }
+                else
+                {
+                    <div class="ui-card"><div class="ui-card-body"><em>Awaiting data for @objRef.Name...</em></div></div>
+                }
+            }
+        </div>
+
+        @foreach (var objRef in _viewDefinition.EcuObjects.Where(o => o.ObjectType is "Table" or "Driver").OrderBy(o => o.Name))
+        {
+            <div class="full-width-item-container">
+                @switch (objRef.ObjectType)
+                {
+                    case "Table":
+                        @if (_tables.TryGetValue(objRef.Id, out var table))
+                        {
+                            <div class="ui-card">
+                                <div class="ui-card-header">@table.Name</div>
+                                <div class="ui-card-body">
+                                    <TableView Table="table"/>
+                                </div>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="ui-card"><div class="ui-card-body"><em>Loading table @objRef.Name...</em></div></div>
+                        }
+                        break;
+                    case "Driver":
+                        @if (_drivers.TryGetValue(objRef.Id, out var driver))
+                        {
+                            <DriverView Driver="driver"/>
+                        }
+                        else
+                        {
+                            <div class="ui-card"><div class="ui-card-body"><em>Loading driver @objRef.Name...</em></div></div>
+                        }
+                        break;
+                }
+            </div>
+        }
+    }
+}
+else
+{
+    <h1>View Not Found</h1>
+    <p>The requested view could not be found.</p>
+}
+
+
+@code {
+    [Parameter]
+    public Guid ViewId { get; set; }
+
+    private bool _isLoading = true;
+    private CustomViewDefinition? _viewDefinition;
+    private CancellationTokenSource? _streamingCts;
+
+    private Dictionary<ushort, RealtimeDataPoint> _realtimeData = new();
+    private Dictionary<ushort, TableData> _tables = new();
+    private Dictionary<ushort, DriverData> _drivers = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        _viewDefinition = await CustomViewService.GetCustomViewByIdAsync(ViewId);
+
+        if (_viewDefinition is not null && ConnState.IsConnected)
+        {
+            await FetchStaticData();
+            await StartStreamingAsync();
+        }
+        
+        _isLoading = false;
+    }
+
+    private async Task FetchStaticData()
+    {
+        if (_viewDefinition is null) return;
+        
+        var tablesToFetch = _viewDefinition.EcuObjects.Where(o => o.ObjectType == "Table");
+        foreach (var tableRef in tablesToFetch)
+        {
+            var tableData = await EcuService.GetTableAsync(tableRef.Id);
+            if (tableData is not null)
+            {
+                _tables[tableData.Id] = tableData;
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+
+        var driversToFetch = _viewDefinition.EcuObjects.Where(o => o.ObjectType == "Driver");
+        foreach (var driverRef in driversToFetch)
+        {
+            var driverData = await EcuService.GetDriverAsync(driverRef.Id);
+            if (driverData is not null)
+            {
+                _drivers[driverData.Id] = driverData;
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+    }
+
+    private async Task StartStreamingAsync()
+    {
+        if (_streamingCts is not null)
+        {
+            await _streamingCts.CancelAsync();
+            _streamingCts.Dispose();
+        }
+        _streamingCts = new CancellationTokenSource();
+
+        var dataLinkIds = _viewDefinition!.EcuObjects
+            .Where(o => o.ObjectType == "DataLink")
+            .Select(o => o.Id)
+            .ToHashSet();
+
+        if (!dataLinkIds.Any()) return;
+        
+        try
+        {
+            await foreach (var dataPoints in EcuService.StreamRealtimeDataAsync(_streamingCts.Token))
+            {
+                bool updated = false;
+                foreach (var dp in dataPoints)
+                {
+                    if (dataLinkIds.Contains(dp.Id))
+                    {
+                        _realtimeData[dp.Id] = dp;
+                        updated = true;
+                    }
+                }
+                if(updated) await InvokeAsync(StateHasChanged);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            Logger.LogInformation("Custom view data stream stopped.");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error in custom view data stream.");
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_streamingCts is not null)
+        {
+            await _streamingCts.CancelAsync();
+            _streamingCts.Dispose();
+        }
+    }
+}

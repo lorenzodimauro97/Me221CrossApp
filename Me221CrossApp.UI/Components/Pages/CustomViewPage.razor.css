@@ -1,0 +1,14 @@
+﻿.datalink-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.datalink-grid > * {
+    flex: 1 1 200px;
+}
+
+.full-width-item-container {
+    margin-bottom: 1rem;
+}

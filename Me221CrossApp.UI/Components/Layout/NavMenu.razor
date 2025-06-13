@@ -1,4 +1,6 @@
-﻿@* No changes needed for the HTML structure itself *@
+﻿@inject ICustomViewService CustomViewService
+@implements IAsyncDisposable
+
 <nav style="@NavContainerStyle">
     <NavLink class="nav-item" href="" Match="NavLinkMatch.All">
         <TablerIcon OutlineIcon="TablerIconOutlineName.Home" Size="40px" />
@@ -14,6 +16,18 @@
             <span>Tables</span>
         }
     </NavLink>
+    
+    @foreach (var view in _customViews.OrderBy(v => v.Name))
+    {
+        <NavLink class="nav-item" href="@($"view/{view.Id}")">
+            <TablerIcon OutlineIcon="@GetIcon(view.IconName)" Size="40px" />
+            @if (IsMobile)
+            {
+                <span>@view.Name</span>
+            }
+        </NavLink>
+    }
+    
     <NavLink class="nav-item" href="settings">
         <TablerIcon OutlineIcon="TablerIconOutlineName.Settings" Size="40px" />
         @if (IsMobile)
@@ -27,22 +41,43 @@
     [Parameter]
     public required bool IsMobile { get; set; }
 
-    /// <summary>
-    /// This computed property applies the correct styling to the <nav> container.
-    /// </summary>
+    private IReadOnlyList<CustomViewDefinition> _customViews = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        CustomViewService.OnCustomViewsChanged += HandleCustomViewsChanged;
+        _customViews = await CustomViewService.GetCustomViewsAsync();
+    }
+
+    private void HandleCustomViewsChanged()
+    {
+        _ = InvokeAsync(async () =>
+        {
+            _customViews = await CustomViewService.GetCustomViewsAsync();
+            StateHasChanged();
+        });
+    }
+
+    private TablerIconOutlineName GetIcon(string iconName)
+    {
+        return Enum.TryParse<TablerIconOutlineName>(iconName, true, out var icon) ? icon : TablerIconOutlineName.QuestionMark;
+    }
+
     private string NavContainerStyle => IsMobile
-        // Mobile: Use flexbox to spread items out and give them space.
         ? "display: flex; justify-content: space-around; align-items: center; width: 100%; padding: 0.5rem 0;"
-        // Desktop: Use a flex column to stack items vertically. The centering is
-        // handled by the parent div in MainLayout.razor.
         : "display: flex; flex-direction: column; gap: 1.5rem;";
+
+    public ValueTask DisposeAsync()
+    {
+        CustomViewService.OnCustomViewsChanged -= HandleCustomViewsChanged;
+        return ValueTask.CompletedTask;
+    }
 }
 
 <style>
-    /* Style for the NavLink items in NavMenu.razor */
     .nav-item {
         display: flex;
-        flex-direction: column; /* Stacks icon and text */
+        flex-direction: column;
         align-items: center;
         gap: 4px;
         text-decoration: none;

@@ -1,0 +1,84 @@
+﻿@inject ICustomViewService CustomViewService
+@inject NavigationManager NavManager
+
+<div class="ui-card-header">Custom Views</div>
+<div class="ui-card-body">
+    @if (_isLoading)
+    {
+        <p>Loading custom views...</p>
+    }
+    else if (_customViews.Any())
+    {
+        <ul class="view-list">
+            @foreach (var view in _customViews.OrderBy(v => v.Name))
+            {
+                <li class="view-item">
+                    <span class="view-name">
+                        <TablerIcon OutlineIcon="@GetIcon(view.IconName)" />
+                        @view.Name
+                    </span>
+                    <div class="button-group">
+                        <button class="ui-button-sm" @onclick="() => EditView(view.Id)">Edit</button>
+                        <button class="ui-button-danger-sm" @onclick="() => DeleteView(view)">Delete</button>
+                    </div>
+                </li>
+            }
+        </ul>
+    }
+    else
+    {
+        <p>No custom views created yet.</p>
+    }
+</div>
+<div class="ui-card-footer">
+    <button class="ui-button" @onclick="AddView">Add New View</button>
+</div>
+
+@code {
+    private IReadOnlyList<CustomViewDefinition> _customViews = [];
+    private bool _isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        CustomViewService.OnCustomViewsChanged += HandleViewsChanged;
+        await LoadViewsAsync();
+    }
+
+    private async Task LoadViewsAsync()
+    {
+        _isLoading = true;
+        _customViews = await CustomViewService.GetCustomViewsAsync();
+        _isLoading = false;
+        StateHasChanged();
+    }
+
+    private void HandleViewsChanged()
+    {
+        _ = InvokeAsync(LoadViewsAsync);
+    }
+
+    private void AddView()
+    {
+        NavManager.NavigateTo("/settings/views/edit");
+    }
+
+    private void EditView(Guid id)
+    {
+        NavManager.NavigateTo($"/settings/views/edit/{id}");
+    }
+
+    private async Task DeleteView(CustomViewDefinition view)
+    {
+        await CustomViewService.DeleteCustomViewAsync(view.Id);
+    }
+
+    private TablerIconOutlineName GetIcon(string iconName)
+    {
+        return Enum.TryParse<TablerIconOutlineName>(iconName, true, out var icon) ? icon : TablerIconOutlineName.None;
+    }
+
+    public void Dispose()
+    {
+        CustomViewService.OnCustomViewsChanged -= HandleViewsChanged;
+    }
+}

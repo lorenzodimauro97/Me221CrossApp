@@ -1,0 +1,29 @@
+﻿@if (Driver is not null)
+{
+    <div class="ui-card">
+        <div class="ui-card-header">
+            Driver: @Driver.Name (@Driver.Id)
+        </div>
+        <div class="ui-card-body">
+            <div class="driver-details-grid">
+                <div class="detail-item">
+                    <span class="detail-label">Config Params</span>
+                    <span class="detail-value">@Driver.ConfigParams.Count</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Input Links</span>
+                    <span class="detail-value">@Driver.InputLinkIds.Count</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Output Links</span>
+                    <span class="detail-value">@Driver.OutputLinkIds.Count</span>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired]
+    public DriverData? Driver { get; set; }
+}

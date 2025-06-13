@@ -61,6 +61,7 @@ namespace ME221CrossApp.UI
             
             builder.Services.AddSingleton<CommunicationMux>();
             builder.Services.AddSingleton<ConnectionStateService>();
+            builder.Services.AddSingleton<ICustomViewService, CustomViewService>();
             
             builder.Services.AddSingleton<IEcuDefinitionService, EcuDefinitionService>();
             builder.Services.AddSingleton<IEcuInteractionService>(sp =>

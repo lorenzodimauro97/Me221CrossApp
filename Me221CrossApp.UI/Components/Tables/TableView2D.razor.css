@@ -38,3 +38,16 @@
     -webkit-appearance: none;
     margin: 0;
 }
+
+.table-2d-container {
+    display: flex;
+    flex-direction: row;
+    gap: 1rem;
+    align-items: flex-start;
+}
+
+.table-values-container {
+    flex: 0 0 250px;
+    max-height: 400px;
+    overflow-y: auto;
+}
