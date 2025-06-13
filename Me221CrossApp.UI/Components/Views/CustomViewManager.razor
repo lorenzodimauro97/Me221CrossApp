@@ -1,5 +1,6 @@
 ﻿@inject ICustomViewService CustomViewService
 @inject NavigationManager NavManager
+@implements IDisposable
 
 <div class="ui-card-header">Custom Views</div>
 <div class="ui-card-body">
@@ -82,3 +83,30 @@
         CustomViewService.OnCustomViewsChanged -= HandleViewsChanged;
     }
 }
+
+<style>
+    .view-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .view-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.75rem;
+        background-color: var(--app-bg-alt-color);
+        border-radius: var(--radius-md);
+    }
+
+    .view-name {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-weight: 500;
+    }
+</style>

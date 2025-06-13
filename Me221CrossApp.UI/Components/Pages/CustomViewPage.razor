@@ -1,6 +1,7 @@
 ﻿@page "/view/{ViewId:guid}"
 @inject ICustomViewService CustomViewService
 @inject IEcuInteractionService EcuService
+@inject IEcuDefinitionService DefinitionService
 @inject ConnectionStateService ConnState
 @inject ILogger<CustomViewPage> Logger
 @implements IAsyncDisposable
@@ -13,6 +14,15 @@ else if (_viewDefinition is not null)
 {
     <PageTitle>@_viewDefinition.Name</PageTitle>
     <h1>@_viewDefinition.Name</h1>
+
+    @if (!string.IsNullOrEmpty(_errorMessage))
+    {
+        <div class="alert alert-danger" role="alert">@_errorMessage</div>
+    }
+    @if (!string.IsNullOrEmpty(_statusMessage))
+    {
+        <div class="alert alert-info" role="alert">@_statusMessage</div>
+    }
 
     @if (!ConnState.IsConnected)
     {
@@ -45,7 +55,17 @@ else if (_viewDefinition is not null)
                             <div class="ui-card">
                                 <div class="ui-card-header">@table.Name</div>
                                 <div class="ui-card-body">
-                                    <TableView Table="table"/>
+                                    <TableView Table="table" TableChanged="(newTable) => OnTableDataChanged(table.Id, newTable)" />
+                                </div>
+                                <div class="ui-card-footer">
+                                    <div class="button-group">
+                                        <button class="ui-button" @onclick="() => UpdateTable(table.Id)" disabled="@(!IsTableDirty(table.Id) || IsTableBusy(table.Id))">
+                                            @if (_isUpdatingTable.TryGetValue(table.Id, out var isUpd) && isUpd) { <span>Updating...</span> } else { <span>Update ECU</span> }
+                                        </button>
+                                        <button class="ui-button-secondary" @onclick="() => StoreTable(table.Id)" disabled="@(IsTableDirty(table.Id) || IsTableBusy(table.Id))">
+                                            @if (_isStoringTable.TryGetValue(table.Id, out var isStr) && isStr) { <span>Storing...</span> } else { <span>Store to Flash</span> }
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         }
@@ -57,7 +77,35 @@ else if (_viewDefinition is not null)
                     case "Driver":
                         @if (_drivers.TryGetValue(objRef.Id, out var driver))
                         {
-                            <DriverView Driver="driver"/>
+                            var definition = GetDriverDefinition(driver.Id);
+                            if (definition is not null)
+                            {
+                                <div class="ui-card">
+                                    <div class="ui-card-header">
+                                        Driver: @driver.Name
+                                    </div>
+                                    <div class="ui-card-body">
+                                        <DriverEditor Driver="driver"
+                                                      Definition="definition"
+                                                      DriverChanged="(newDriver) => OnDriverDataChanged(driver.Id, newDriver)"
+                                                      DataLinks="_dataLinks"/>
+                                    </div>
+                                    <div class="ui-card-footer">
+                                        <div class="button-group">
+                                            <button class="ui-button" @onclick="() => UpdateDriver(driver.Id)" disabled="@(!IsDriverDirty(driver.Id) || IsDriverBusy(driver.Id))">
+                                                @if (_isUpdatingDriver.TryGetValue(driver.Id, out var isUpd) && isUpd) { <span>Updating...</span> } else { <span>Update ECU</span> }
+                                            </button>
+                                            <button class="ui-button-secondary" @onclick="() => StoreDriver(driver.Id)" disabled="@(IsDriverDirty(driver.Id) || IsDriverBusy(driver.Id))">
+                                                @if (_isStoringDriver.TryGetValue(driver.Id, out var isStr) && isStr) { <span>Storing...</span> } else { <span>Store to Flash</span> }
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="ui-card"><div class="ui-card-body"><em>Definition not found for driver @objRef.Name...</em></div></div>
+                            }
                         }
                         else
                         {
@@ -83,10 +131,21 @@ else
     private bool _isLoading = true;
     private CustomViewDefinition? _viewDefinition;
     private CancellationTokenSource? _streamingCts;
+    
+    private string? _errorMessage;
+    private string? _statusMessage;
 
-    private Dictionary<ushort, RealtimeDataPoint> _realtimeData = new();
-    private Dictionary<ushort, TableData> _tables = new();
-    private Dictionary<ushort, DriverData> _drivers = new();
+    private readonly Dictionary<ushort, RealtimeDataPoint> _realtimeData = new();
+    private readonly Dictionary<ushort, TableData> _tables = new();
+    private readonly Dictionary<ushort, TableData> _originalTables = new();
+    private readonly Dictionary<ushort, DriverData> _drivers = new();
+    private readonly Dictionary<ushort, DriverData> _originalDrivers = new();
+    private IReadOnlyList<EcuObjectDefinition> _dataLinks = [];
+    
+    private readonly Dictionary<ushort, bool> _isUpdatingTable = new();
+    private readonly Dictionary<ushort, bool> _isStoringTable = new();
+    private readonly Dictionary<ushort, bool> _isUpdatingDriver = new();
+    private readonly Dictionary<ushort, bool> _isStoringDriver = new();
 
     protected override async Task OnInitializedAsync()
     {
@@ -95,10 +154,72 @@ else
         if (_viewDefinition is not null && ConnState.IsConnected)
         {
             await FetchStaticData();
+            if (_viewDefinition.EcuObjects.Any(o => o.ObjectType == "Driver"))
+            {
+                try
+                {
+                    _dataLinks = await EcuService.GetDataLinkListAsync(true);
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogError(ex, "Failed to load data links for driver editor.");
+                    _errorMessage = "Could not load data links needed for driver editing.";
+                }
+            }
             await StartStreamingAsync();
         }
         
         _isLoading = false;
+    }
+
+    private EcuObjectDefinition? GetDriverDefinition(ushort driverId)
+    {
+        return DefinitionService.TryGetObject(driverId, out var def) ? def : null;
+    }
+    
+    private bool IsTableDirty(ushort tableId) =>
+        _originalTables.TryGetValue(tableId, out var original) &&
+        _tables.TryGetValue(tableId, out var current) &&
+        !original.Output.SequenceEqual(current.Output);
+    
+    private bool IsTableBusy(ushort tableId) =>
+        (_isUpdatingTable.TryGetValue(tableId, out var isUpdating) && isUpdating) ||
+        (_isStoringTable.TryGetValue(tableId, out var isStoring) && isStoring);
+    
+    private bool IsDriverDirty(ushort driverId)
+    {
+        if (!_originalDrivers.TryGetValue(driverId, out var original) || !_drivers.TryGetValue(driverId, out var current))
+        {
+            return false;
+        }
+        if (!original.ConfigParams.SequenceEqual(current.ConfigParams)) return true;
+        if (!original.InputLinkIds.SequenceEqual(current.InputLinkIds)) return true;
+        if (!original.OutputLinkIds.SequenceEqual(current.OutputLinkIds)) return true;
+        return false;
+    }
+    
+    private bool IsDriverBusy(ushort driverId)
+    {
+        return (_isUpdatingDriver.TryGetValue(driverId, out var isUpdating) && isUpdating) || 
+               (_isStoringDriver.TryGetValue(driverId, out var isStoring) && isStoring);
+    }
+    
+    private void OnTableDataChanged(ushort tableId, TableData newTableData)
+    {
+        if (_tables.ContainsKey(tableId))
+        {
+            _tables[tableId] = newTableData;
+            StateHasChanged();
+        }
+    }
+    
+    private void OnDriverDataChanged(ushort driverId, DriverData newDriverData)
+    {
+        if (_drivers.ContainsKey(driverId))
+        {
+            _drivers[driverId] = newDriverData;
+            StateHasChanged();
+        }
     }
 
     private async Task FetchStaticData()
@@ -112,7 +233,7 @@ else
             if (tableData is not null)
             {
                 _tables[tableData.Id] = tableData;
-                await InvokeAsync(StateHasChanged);
+                _originalTables[tableData.Id] = tableData;
             }
         }
 
@@ -123,8 +244,135 @@ else
             if (driverData is not null)
             {
                 _drivers[driverData.Id] = driverData;
-                await InvokeAsync(StateHasChanged);
+                _originalDrivers[driverData.Id] = driverData;
             }
+        }
+        await InvokeAsync(StateHasChanged);
+    }
+    
+    private async Task UpdateTable(ushort tableId)
+    {
+        if (!_tables.TryGetValue(tableId, out var tableData) || !IsTableDirty(tableId)) return;
+
+        _isUpdatingTable[tableId] = true;
+        _statusMessage = $"Updating table {tableData.Name} on ECU...";
+        _errorMessage = null;
+        await InvokeAsync(StateHasChanged);
+
+        try
+        {
+            await EcuService.UpdateTableAsync(tableData);
+            _originalTables[tableId] = tableData;
+            _statusMessage = $"Table {tableData.Name} updated successfully.";
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to update table {TableId}", tableId);
+            _errorMessage = $"Failed to update table {tableData.Name}: {ex.Message}";
+            _statusMessage = null;
+        }
+        finally
+        {
+            _isUpdatingTable[tableId] = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private async Task StoreTable(ushort tableId)
+    {
+        if (!_tables.TryGetValue(tableId, out var tableData)) return;
+
+        if (IsTableDirty(tableId))
+        {
+            _errorMessage = $"There are unsaved changes for {tableData.Name}. Please 'Update ECU' before storing to flash.";
+            _statusMessage = null;
+            await InvokeAsync(StateHasChanged);
+            return;
+        }
+
+        _isStoringTable[tableId] = true;
+        _statusMessage = $"Storing table {tableData.Name} to ECU flash...";
+        _errorMessage = null;
+        await InvokeAsync(StateHasChanged);
+
+        try
+        {
+            await EcuService.StoreTableAsync(tableId);
+            _statusMessage = $"Table {tableData.Name} successfully stored to flash.";
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to store table {TableId}", tableId);
+            _errorMessage = $"Failed to store table {tableData.Name}: {ex.Message}";
+            _statusMessage = null;
+        }
+        finally
+        {
+            _isStoringTable[tableId] = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+    
+    private async Task UpdateDriver(ushort driverId)
+    {
+        if (!_drivers.TryGetValue(driverId, out var driverData) || !IsDriverDirty(driverId)) return;
+
+        _isUpdatingDriver[driverId] = true;
+        _statusMessage = $"Updating driver {driverData.Name} on ECU...";
+        _errorMessage = null;
+        await InvokeAsync(StateHasChanged);
+
+        try
+        {
+            await EcuService.UpdateDriverAsync(driverData);
+            _originalDrivers[driverId] = driverData;
+            _statusMessage = $"Driver {driverData.Name} updated successfully.";
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to update driver {DriverId}", driverId);
+            _errorMessage = $"Failed to update driver {driverData.Name}: {ex.Message}";
+            _statusMessage = null;
+        }
+        finally
+        {
+            _isUpdatingDriver[driverId] = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+    
+    private async Task StoreDriver(ushort driverId)
+    {
+        if (!_drivers.TryGetValue(driverId, out var driverData)) return;
+
+        if (IsDriverDirty(driverId))
+        {
+            _errorMessage = $"There are unsaved changes for {driverData.Name}. Please 'Update ECU' before storing to flash.";
+            _statusMessage = null;
+            await InvokeAsync(StateHasChanged);
+            return;
+        }
+
+        _isStoringDriver[driverId] = true;
+        _statusMessage = $"Storing driver {driverData.Name} to ECU flash...";
+        _errorMessage = null;
+        await InvokeAsync(StateHasChanged);
+
+        try
+        {
+            await EcuService.StoreDriverAsync(driverId);
+            _statusMessage = $"Driver {driverData.Name} successfully stored to flash.";
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to store driver {DriverId}", driverId);
+            _errorMessage = $"Failed to store driver {driverData.Name}: {ex.Message}";
+            _statusMessage = null;
+        }
+        finally
+        {
+            _isStoringDriver[driverId] = false;
+            await InvokeAsync(StateHasChanged);
         }
     }
 
