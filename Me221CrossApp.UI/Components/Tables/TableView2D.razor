@@ -5,26 +5,26 @@
     <div class="table-responsive">
         <table class="table table-bordered table-striped table-sm text-center">
             <thead>
-                <tr>
-                    <th>X-Axis</th>
-                    <th>Value</th>
-                </tr>
+            <tr>
+                <th>X-Axis</th>
+                <th>Value</th>
+            </tr>
             </thead>
             <tbody>
-                @for (var i = 0; i < Table.Output.Count; i++)
-                {
-                    var index = i;
-                    <tr class="@(IsCellActive(index) ? "active-row" : "")">
-                        <td>@Table.XAxis[index].ToString("F1")</td>
-                        <td style="background-color: @ColorHelper.GetColorForValue(Table.Output[index], _min, _max)">
-                            <input type="number"
-                                   step="any"
-                                   class="table-input"
-                                   value="@Table.Output[index].ToString("F2", CultureInfo.InvariantCulture)"
-                                   @onchange="(e) => OnValueChanged(index, e.Value)" />
-                        </td>
-                    </tr>
-                }
+            @for (var i = 0; i < Table.Output.Count; i++)
+            {
+            var index = i;
+            <tr class="@(IsCellActive(index) ? "active-row" : "")">
+                <td>@Table.XAxis[index].ToString("F1")</td>
+                <td style="background-color: @ColorHelper.GetColorForValue(Table.Output[index], _min, _max)">
+                    <input type="number"
+                           step="any"
+                           class="table-input"
+                           value="@Table.Output[index].ToString("F2", CultureInfo.InvariantCulture)"
+                           @onchange="(e) => OnValueChanged(index, e.Value)" />
+                </td>
+            </tr>
+            }
             </tbody>
         </table>
     </div>
@@ -35,114 +35,114 @@
 
 
 @code {
-    [Parameter, EditorRequired]
-    public TableData Table { get; set; } = null!;
+[Parameter, EditorRequired]
+public TableData Table { get; set; } = null!;
 
-    [Parameter]
-    public EventCallback<TableData> TableChanged { get; set; }
-    
-    [Parameter]
-    public float? XAxisValue { get; set; }
+[Parameter]
+public EventCallback<TableData> TableChanged { get; set; }
 
-    private float _min, _max;
-    private IReadOnlyList<PointF> _chartData = [];
-    private int? _activeIndex;
-    private TableData? _cachedTable;
+[Parameter]
+public float? XAxisValue { get; set; }
 
-    protected override void OnParametersSet()
-    {
-        if (Table != _cachedTable)
-        {
-            _cachedTable = Table;
-            if (Table.Output.Any())
-            {
-                _min = Table.Output.Min();
-                _max = Table.Output.Max();
-            }
+private float _min, _max;
+private IReadOnlyList<PointF> _chartData = [];
+private int? _activeIndex;
+private TableData? _cachedTable;
 
-            if (Table.XAxis.Any() && Table.Output.Any() && Table.XAxis.Count == Table.Output.Count)
-            {
-                _chartData = Table.XAxis
-                    .Zip(Table.Output, (x, y) => new PointF(x, y))
-                    .ToList();
-            }
-            else
-            {
-                _chartData = [];
-            }
-        }
+protected override void OnParametersSet()
+{
+if (Table != _cachedTable)
+{
+_cachedTable = Table;
+if (Table.Output.Any())
+{
+_min = Table.Output.Min();
+_max = Table.Output.Max();
+}
 
-        _activeIndex = null;
-        if (XAxisValue.HasValue)
-        {
-            var isHrtTable = Table.Name.Contains("HRT", StringComparison.OrdinalIgnoreCase);
-            var axisToSearch = isHrtTable ? Table.Output : Table.XAxis;
-            
-            if (axisToSearch.Any())
-            {
-                _activeIndex = FindAxisIndex(axisToSearch, XAxisValue.Value);
-            }
-        }
-    }
-    
-    private bool IsCellActive(int index)
-    {
-        if (!_activeIndex.HasValue || _activeIndex.Value == -1) return false;
-        
-        return index == _activeIndex.Value || index == _activeIndex.Value + 1;
-    }
+if (Table.XAxis.Any() && Table.Output.Any() && Table.XAxis.Count == Table.Output.Count)
+{
+_chartData = Table.XAxis
+.Zip(Table.Output, (x, y) => new PointF(x, y))
+.ToList();
+}
+else
+{
+_chartData = [];
+}
+}
 
-    private int FindAxisIndex(IReadOnlyList<float> axis, float value)
-    {
-        if (axis.Count < 2) return axis.Count > 0 ? 0 : -1;
+_activeIndex = null;
+if (XAxisValue.HasValue)
+{
+var isHrtTable = Table.Name.Contains("HRT", StringComparison.OrdinalIgnoreCase);
+var axisToSearch = isHrtTable ? Table.Output : Table.XAxis;
 
-        for (var i = 0; i < axis.Count - 1; i++)
-        {
-            var p1 = axis[i];
-            var p2 = axis[i + 1];
-            if ((value >= p1 && value <= p2) || (value <= p1 && value >= p2))
-            {
-                return i;
-            }
-        }
+if (axisToSearch.Any())
+{
+_activeIndex = FindAxisIndex(axisToSearch, XAxisValue.Value);
+}
+}
+}
 
-        if (Math.Abs(value - axis[0]) < Math.Abs(value - axis[^1]))
-        {
-            return 0;
-        }
-        
-        return axis.Count - 2;
-    }
+private bool IsCellActive(int index)
+{
+if (!_activeIndex.HasValue || _activeIndex.Value == -1) return false;
 
-    private Task OnValueChanged(int index, object? value)
-    {
-        if (float.TryParse(value?.ToString(), NumberStyles.Any, CultureInfo.InvariantCulture, out var floatValue))
-        {
-            var newOutput = Table.Output.ToList();
-            newOutput[index] = floatValue;
-            return TableChanged.InvokeAsync(Table with { Output = newOutput });
-        }
-        return Task.CompletedTask;
-    }
+return index == _activeIndex.Value || index == _activeIndex.Value + 1;
+}
+
+private int FindAxisIndex(IReadOnlyList<float> axis, float value)
+{
+if (axis.Count < 2) return axis.Count > 0 ? 0 : -1;
+
+for (var i = 0; i < axis.Count - 1; i++)
+{
+var p1 = axis[i];
+var p2 = axis[i + 1];
+if ((value >= p1 && value <= p2) || (value <= p1 && value >= p2))
+{
+return i;
+}
+}
+
+if (Math.Abs(value - axis[0]) < Math.Abs(value - axis[^1]))
+{
+return 0;
+}
+
+return axis.Count - 2;
+}
+
+private Task OnValueChanged(int index, object? value)
+{
+if (float.TryParse(value?.ToString(), NumberStyles.Any, CultureInfo.InvariantCulture, out var floatValue))
+{
+var newOutput = Table.Output.ToList();
+newOutput[index] = floatValue;
+return TableChanged.InvokeAsync(Table with { Output = newOutput });
+}
+return Task.CompletedTask;
+}
 }
 
 <style>
     .table-view-2d-container {
         display: flex;
-        flex-direction: row;
+        flex-wrap: wrap;
         gap: 1rem;
         width: 100%;
     }
 
     .table-responsive {
-        flex: 0 0 250px;
+        flex: 1 1 250px;
         overflow-y: auto;
         max-height: 500px;
     }
 
     .chart-area {
-        flex: 1 1 auto;
-        min-width: 0;
+        flex: 3 1 400px;
+        min-width: 300px;
     }
 
     .table-input {
@@ -168,25 +168,13 @@
         margin: 0;
     }
 
-    .table-2d-container {
-        display: flex;
-        flex-direction: row;
-        gap: 1rem;
-        align-items: flex-start;
-    }
-
-    .table-values-container {
-        flex: 0 0 250px;
-        max-height: 400px;
-        overflow-y: auto;
-    }
-
     tr.active-row td {
-        background-color: white !important;
+        outline: 2px solid var(--primary-color);
+        outline-offset: -2px;
     }
 
     tr.active-row td .table-input {
-        color: black;
+        color: var(--text-color-headings);
         font-weight: bold;
     }
 </style>

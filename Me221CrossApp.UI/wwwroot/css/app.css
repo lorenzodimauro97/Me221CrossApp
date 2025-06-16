@@ -11,7 +11,8 @@
     --app-bg-hover-color: #2c2e33;
     --border-color: #373a40;
     --text-color: #c1c2c5;
-    --text-color-light: #868e96;
+    --text-color-secondary: #868e96;
+    --text-color-headings: #f8f9fa;
 
     --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
     --font-size: 16px;
@@ -25,9 +26,6 @@
     --spacing-md: 1rem;
     --spacing-lg: 1.5rem;
     --spacing-xl: 2rem;
-
-    --desktop-nav-width: 260px;
-    --mobile-nav-height: 60px;
 }
 
 html, body {
@@ -36,21 +34,18 @@ html, body {
     color: var(--text-color);
     font-size: var(--font-size);
     line-height: var(--line-height);
+    margin: 0;
+    padding: 0;
 }
 
 h1, h2, h3, h4, h5, h6 {
-    color: var(--text-color);
+    color: var(--text-color-headings);
     font-weight: 600;
 }
 
-h1 {
-    font-size: 1.8rem;
-    margin-bottom: var(--spacing-lg);
-}
-
-h5 {
-    margin-bottom: var(--spacing-sm);
-}
+h1 { font-size: 1.8rem; margin-bottom: var(--spacing-lg); }
+h4 { font-size: 1.2rem; margin-bottom: var(--spacing-sm); }
+h5 { font-size: 1.1rem; margin-bottom: var(--spacing-sm); }
 
 h1:focus {
     outline: none;
@@ -102,14 +97,14 @@ a:hover {
     background-color: var(--app-bg-alt-color);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-md);
-    margin: var(--spacing-md) 0;
+    margin-bottom: var(--spacing-lg);
 }
 
 .ui-card-header {
     padding: var(--spacing-sm) var(--spacing-md);
     border-bottom: 1px solid var(--border-color);
     font-weight: 600;
-    color: var(--text-color);
+    color: var(--text-color-headings);
 }
 
 .ui-card-body {
@@ -125,7 +120,7 @@ a:hover {
     gap: var(--spacing-sm);
 }
 
-.ui-button, .ui-button-danger, .ui-button-secondary {
+.ui-button, .ui-button-danger, .ui-button-secondary, .ui-button-sm, .ui-button-danger-sm {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -137,35 +132,27 @@ a:hover {
     font-family: var(--font-family);
     font-size: 0.9rem;
     cursor: pointer;
-    transition: background-color 0.2s;
+    transition: background-color 0.2s, border-color 0.2s;
 }
 
-.ui-button {
-    background-color: var(--primary-color);
-    color: white;
-}
-.ui-button:hover {
-    background-color: #1c7ed6;
+.ui-button-sm, .ui-button-danger-sm {
+    height: 30px;
+    padding: 0 0.8rem;
+    font-size: 0.8rem;
 }
 
-.ui-button-danger {
-    background-color: var(--danger-color);
-    color: white;
-}
-.ui-button-danger:hover {
-    background-color: #e03131;
-}
+.ui-button { background-color: var(--primary-color); color: white; }
+.ui-button:hover { background-color: var(--primary-color-strong); }
 
-.ui-button-secondary {
-    background-color: var(--app-bg-hover-color);
-    border-color: var(--border-color);
-    color: var(--text-color);
-}
-.ui-button-secondary:hover {
-    background-color: #373A40;
-}
+.ui-button-danger { background-color: var(--danger-color); color: white; }
+.ui-button-danger:hover { background-color: #e03131; }
 
-.ui-button:disabled, .ui-button-danger:disabled, .ui-button-secondary:disabled {
+.ui-button-secondary { background-color: var(--app-bg-hover-color); border-color: var(--border-color); color: var(--text-color); }
+.ui-button-secondary:hover { background-color: var(--border-color); }
+.ui-button-secondary.active { background-color: var(--primary-color); border-color: var(--primary-color); color: white; }
+
+
+.ui-button:disabled, .ui-button-danger:disabled, .ui-button-secondary:disabled, .ui-button-sm:disabled, .ui-button-danger-sm:disabled {
     opacity: 0.5;
     cursor: not-allowed;
 }
@@ -195,6 +182,7 @@ a:hover {
 .ui-input-group {
     display: flex;
     gap: var(--spacing-sm);
+    align-items: center;
 }
 
 .ui-input-group .ui-input, .ui-input-group .ui-select {
@@ -209,166 +197,36 @@ a:hover {
     font-size: 0.9rem;
 }
 
-.alert-danger {
-    color: #ffc9c9;
-    background-color: rgba(250, 82, 82, 0.2);
-    border-color: rgba(250, 82, 82, 0.4);
-}
-.alert-info {
-    color: #a5d8ff;
-    background-color: rgba(34, 139, 230, 0.15);
-    border-color: rgba(34, 139, 230, 0.3);
-}
-.alert-warning {
-    color: #ffe8a3;
-    background-color: rgba(250, 176, 5, 0.15);
-    border-color: rgba(250, 176, 5, 0.3);
-}
+.alert-danger { color: #ffc9c9; background-color: rgba(250, 82, 82, 0.2); border-color: rgba(250, 82, 82, 0.4); }
+.alert-info { color: #a5d8ff; background-color: rgba(34, 139, 230, 0.15); border-color: rgba(34, 139, 230, 0.3); }
+.alert-warning { color: #ffe8a3; background-color: rgba(250, 176, 5, 0.15); border-color: rgba(250, 176, 5, 0.3); }
 
-.table {
-    width: 100%;
-    border-collapse: collapse;
-}
-.table th, .table td {
-    padding: 0.75rem;
-    vertical-align: top;
-    border-top: 1px solid var(--border-color);
-    text-align: left;
-}
-.table thead th {
-    vertical-align: bottom;
-    border-bottom: 2px solid var(--border-color);
-    color: var(--text-color);
-    font-weight: 600;
-}
-.table-striped tbody tr:nth-of-type(odd) {
-    background-color: var(--app-bg-hover-color);
-}
-.table-sm th, .table-sm td {
-    padding: 0.5rem;
-}
+.table { width: 100%; border-collapse: collapse; }
+.table th, .table td { padding: 0.75rem; vertical-align: top; border-top: 1px solid var(--border-color); text-align: left; }
+.table thead th { vertical-align: bottom; border-bottom: 2px solid var(--border-color); color: var(--text-color-headings); font-weight: 600; }
+.table-striped tbody tr:nth-of-type(odd) { background-color: var(--app-bg-hover-color); }
+.table-sm th, .table-sm td { padding: 0.5rem; }
+.table-responsive { overflow-x: auto; }
+.text-center { text-align: center; }
+.table-bordered th, .table-bordered td { border: 1px solid var(--border-color); }
 
-.table-responsive {
-    overflow-x: auto;
-}
+.code-block { font-family: monospace; background: var(--app-bg-color); padding: 2px 6px; border-radius: var(--radius-sm); font-size: 0.85rem; border: 1px solid var(--border-color); }
 
-.text-center {
-    text-align: center;
-}
+.button-group { display: flex; gap: 0.75rem; }
 
-.table-bordered th, .table-bordered td {
-    border: 1px solid var(--border-color);
-}
+.data-grid-container { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: var(--spacing-md); max-height: 60vh; overflow-y: auto; padding: var(--spacing-xs); }
 
-.code-block {
-    font-family: monospace;
-    background: var(--app-bg-color);
-    padding: 2px 6px;
-    border-radius: var(--radius-sm);
-    font-size: 0.85rem;
-    border: 1px solid var(--border-color);
-}
+.data-card { background-color: var(--app-bg-color); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: var(--spacing-sm) var(--spacing-md); display: flex; flex-direction: column; justify-content: center; align-items: center; gap: var(--spacing-xs); text-align: center; transition: all 0.2s ease-in-out; }
+.data-card:hover { transform: translateY(-2px); border-color: var(--primary-color); box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2); }
+.data-card-name { font-size: 0.85rem; color: var(--text-color-secondary); font-weight: 500; word-break: break-word; }
+.data-card-value { font-size: 1.75rem; font-weight: 700; color: var(--text-color-headings); line-height: 1.2; }
 
-.button-group {
-    margin-top: 1.5rem;
-    display: flex;
-    gap: 0.75rem;
-}
+.divider { border-top: 1px solid var(--border-color); margin: var(--spacing-lg) 0; }
 
-.data-grid-container {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-    gap: var(--spacing-md);
-    max-height: 60vh;
-    overflow-y: auto;
-    padding: var(--spacing-xs);
-}
+.grid-row { display: flex; flex-direction: row; gap: var(--spacing-md); width: 100%; }
+.grid-col-1 { flex-basis: 8.333333%; }
+.grid-col-11 { flex-basis: 91.666667%; }
+.grid-col-12 { flex-basis: 100%; }
 
-.data-card {
-    background-color: var(--app-bg-color);
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-sm);
-    padding: var(--spacing-sm) var(--spacing-md);
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    gap: var(--spacing-xs);
-    text-align: center;
-    transition: all 0.2s ease-in-out;
-}
-
-.data-card:hover {
-    transform: translateY(-2px);
-    border-color: var(--primary-color);
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
-}
-
-.data-card-name {
-    font-size: 0.85rem;
-    color: var(--text-color-light);
-    font-weight: 500;
-    word-break: break-word;
-}
-
-.data-card-value {
-    font-size: 1.75rem;
-    font-weight: 700;
-    color: var(--text-color);
-    line-height: 1.2;
-}
-
-.divider {
-    border-top: 1px solid var(--border-color);
-    margin: var(--spacing-lg) 0;
-}
-
-.grid-row {
-    display: grid;
-    /* On mobile, stack everything in a single column by default */
-    grid-template-columns: 1fr;
-    gap: var(--spacing-md);
-    width: 100%;
-}
-
-/* On screens 768px and wider, switch to a 12-column grid */
-@media (min-width: 768px) {
-    .grid-row {
-        grid-template-columns: repeat(12, 1fr);
-    }
-}
-
-/*
- * Generate column classes.
- * .grid-col-1 will span 1 column, .grid-col-2 will span 2, and so on.
- * These work in conjunction with the media query above.
- */
-.grid-col-1 { grid-column: span 1; }
-.grid-col-2 { grid-column: span 2; }
-.grid-col-3 { grid-column: span 3; }
-.grid-col-4 { grid-column: span 4; }
-.grid-col-5 { grid-column: span 5; }
-.grid-col-6 { grid-column: span 6; }
-.grid-col-7 { grid-column: span 7; }
-.grid-col-8 { grid-column: span 8; }
-.grid-col-9 { grid-column: span 9; }
-.grid-col-10 { grid-column: span 10; }
-.grid-col-11 { grid-column: span 11; }
-.grid-col-12 { grid-column: span 12; }
-
-/* Optional modifier to remove the gap between columns */
-.grid-row-no-gap {
-    gap: 0;
-}
-
-.debug-info {
-    font-family: monospace;
-    font-size: 0.9rem;
-    background-color: var(--app-bg-color);
-    padding: var(--spacing-sm);
-    border-radius: var(--radius-sm);
-}
-
-.debug-info > div {
-    padding-bottom: 0.25rem;
-}
+.debug-info { font-family: monospace; font-size: 0.9rem; background-color: var(--app-bg-color); padding: var(--spacing-sm); border-radius: var(--radius-sm); }
+.debug-info > div { padding-bottom: 0.25rem; }

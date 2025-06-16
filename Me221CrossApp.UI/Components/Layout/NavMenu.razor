@@ -2,46 +2,31 @@
 @using ME221CrossApp.UI.Services
 @implements IAsyncDisposable
 
-<nav style="@NavContainerStyle">
+<nav class="nav-container">
     <NavLink class="nav-item" href="" Match="NavLinkMatch.All">
-        <TablerIcon OutlineIcon="TablerIconOutlineName.Home" Size="40px" />
-        @if (IsMobile)
-        {
-            <span>Home</span>
-        }
+        <TablerIcon OutlineIcon="TablerIconOutlineName.Home" Size="28px" />
+        <span class="nav-text">Home</span>
     </NavLink>
     <NavLink class="nav-item" href="tables">
-        <TablerIcon OutlineIcon="TablerIconOutlineName.Table" Size="40px" />
-        @if (IsMobile)
-        {
-            <span>Tables</span>
-        }
+        <TablerIcon OutlineIcon="TablerIconOutlineName.Table" Size="28px" />
+        <span class="nav-text">Tables</span>
     </NavLink>
     <NavLink class="nav-item" href="drivers">
-        <TablerIcon OutlineIcon="TablerIconOutlineName.SteeringWheel" Size="40px" />
-        @if (IsMobile)
-        {
-            <span>Drivers</span>
-        }
+        <TablerIcon OutlineIcon="TablerIconOutlineName.SteeringWheel" Size="28px" />
+        <span class="nav-text">Drivers</span>
     </NavLink>
     
     @foreach (var view in _customViews.OrderBy(v => v.Name))
     {
         <NavLink class="nav-item" href="@($"view/{view.Id}")">
-            <TablerIcon OutlineIcon="@GetIcon(view.IconName)" Size="40px" />
-            @if (IsMobile)
-            {
-                <span>@view.Name</span>
-            }
+            <TablerIcon OutlineIcon="@GetIcon(view.IconName)" Size="28px" />
+            <span class="nav-text">@view.Name</span>
         </NavLink>
     }
     
     <NavLink class="nav-item" href="settings">
-        <TablerIcon OutlineIcon="TablerIconOutlineName.Settings" Size="40px" />
-        @if (IsMobile)
-        {
-            <span>Settings</span>
-        }
+        <TablerIcon OutlineIcon="TablerIconOutlineName.Settings" Size="28px" />
+        <span class="nav-text">Settings</span>
     </NavLink>
 </nav>
 
@@ -71,10 +56,6 @@
         return Enum.TryParse<TablerIconOutlineName>(iconName, true, out var icon) ? icon : TablerIconOutlineName.QuestionMark;
     }
 
-    private string NavContainerStyle => IsMobile
-        ? "display: flex; justify-content: space-around; align-items: center; width: 100%; padding: 0.5rem 0;"
-        : "display: flex; flex-direction: column; gap: 1.5rem;";
-
     public ValueTask DisposeAsync()
     {
         CustomViewService.OnCustomViewsChanged -= HandleCustomViewsChanged;
@@ -83,15 +64,66 @@
 }
 
 <style>
+    .nav-container {
+        display: flex;
+        height: 100%;
+    }
+
     .nav-item {
         display: flex;
-        flex-direction: column;
         align-items: center;
-        gap: 4px;
         text-decoration: none;
+        color: var(--text-color-secondary);
+        transition: color 0.2s, background-color 0.2s;
+        border-radius: var(--radius-md);
+    }
+
+    .nav-item:hover {
+        color: var(--text-color-headings);
+        background-color: var(--app-bg-hover-color);
     }
 
     .nav-item.active {
-        color: #ffffff;
+        color: var(--primary-color);
+    }
+    
+    .nav-text {
+        font-weight: 500;
+        font-size: 0.9rem;
+    }
+
+    /* Mobile Styles */
+    @@media (max-width: 767px) {
+        .nav-container {
+            justify-content: space-around;
+            align-items: center;
+            width: 100%;
+        }
+        .nav-item {
+            flex-direction: column;
+            gap: 2px;
+            padding: var(--spacing-xs);
+        }
+        .nav-text {
+            font-size: 0.7rem;
+        }
+    }
+
+    /* Desktop Styles */
+    @@media (min-width: 768px) {
+        .nav-container {
+            flex-direction: column;
+            gap: 1rem;
+            align-items: center;
+        }
+        .nav-item {
+            flex-direction: column;
+            gap: 4px;
+            padding: var(--spacing-sm);
+            width: 60px;
+        }
+        .nav-text {
+            display: none;
+        }
     }
 </style>

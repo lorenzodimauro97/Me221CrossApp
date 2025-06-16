@@ -13,201 +13,148 @@
 
 @if (_currentView == ViewMode.Table)
 {
-    <div class="table-3d-container">
-        <div class="table-3d-scene">
-            <table class="table-3d">
-                <thead>
-                    <tr>
-                        <th></th>
-                        @foreach (var x in Table.XAxis)
-                        {
-                            <th>@x.ToString("F0")</th>
-                        }
-                    </tr>
-                </thead>
-                <tbody>
-                    @for (var i = 0; i < Table.Rows; i++)
-                    {
-                        var rowIndex = i;
-                        <tr>
-                            <th>@Table.YAxis[rowIndex].ToString("F0")</th>
-                            @for (var j = 0; j < Table.Cols; j++)
-                            {
-                                var colIndex = j;
-                                var index = rowIndex * Table.Cols + colIndex;
-                                var val = Table.Output[index];
-                                <td class="@(IsCellActive(rowIndex, colIndex) ? "active-cell" : "")"
-                                    style="background-color: @ColorHelper.GetColorForValue(val, _min, _max)">
-                                    <input type="number"
-                                           step="any"
-                                           class="table-input"
-                                           value="@val.ToString("F1", CultureInfo.InvariantCulture)"
-                                           @onchange="(e) => OnValueChanged(index, e.Value)" />
-                                </td>
-                            }
-                        </tr>
-                    }
-                </tbody>
-            </table>
-        </div>
-    </div>
+<div class="table-responsive">
+    <table class="table table-bordered table-sm text-center">
+        <thead>
+        <tr>
+            <th></th>
+            @foreach (var x in Table.XAxis)
+            {
+            <th>@x.ToString("F0")</th>
+            }
+        </tr>
+        </thead>
+        <tbody>
+        @for (var i = 0; i < Table.Rows; i++)
+        {
+        var rowIndex = i;
+        <tr>
+            <th>@Table.YAxis[rowIndex].ToString("F0")</th>
+            @for (var j = 0; j < Table.Cols; j++)
+            {
+            var colIndex = j;
+            var index = rowIndex * Table.Cols + colIndex;
+            var val = Table.Output[index];
+            <td class="@(IsCellActive(rowIndex, colIndex) ? "active-cell" : "")"
+                style="background-color: @ColorHelper.GetColorForValue(val, _min, _max)">
+                <input type="number"
+                       step="any"
+                       class="table-input"
+                       value="@val.ToString("F1", CultureInfo.InvariantCulture)"
+                       @onchange="(e) => OnValueChanged(index, e.Value)" />
+            </td>
+            }
+        </tr>
+        }
+        </tbody>
+    </table>
+</div>
 }
 else
 {
-    <div class="table-3d-container">
-        <SurfacePlot3D Table="Table" />
-    </div>
+<div class="plot-container">
+    <SurfacePlot3D Table="Table" />
+</div>
 }
 
 @code {
-    private enum ViewMode { Table, Plot }
-    private ViewMode _currentView = ViewMode.Table;
-    
-    private float _min, _max;
-    private int? _activeIndexX;
-    private int? _activeIndexY;
+private enum ViewMode { Table, Plot }
+private ViewMode _currentView = ViewMode.Table;
 
-    [Parameter, EditorRequired]
-    public TableData Table { get; set; } = null!;
+private float _min, _max;
+private int? _activeIndexX;
+private int? _activeIndexY;
 
-    [Parameter]
-    public EventCallback<TableData> TableChanged { get; set; }
-    
-    [Parameter]
-    public float? XAxisValue { get; set; }
+[Parameter, EditorRequired]
+public TableData Table { get; set; } = null!;
 
-    [Parameter]
-    public float? YAxisValue { get; set; }
+[Parameter]
+public EventCallback<TableData> TableChanged { get; set; }
 
-    protected override void OnParametersSet()
-    {
-        if (Table.Output.Any())
-        {
-            _min = Table.Output.Min();
-            _max = Table.Output.Max();
-        }
+[Parameter]
+public float? XAxisValue { get; set; }
 
-        _activeIndexX = null;
-        if (XAxisValue.HasValue && Table.XAxis.Any())
-        {
-            _activeIndexX = FindAxisIndex(Table.XAxis, XAxisValue.Value);
-        }
+[Parameter]
+public float? YAxisValue { get; set; }
 
-        _activeIndexY = null;
-        if (YAxisValue.HasValue && Table.YAxis.Any())
-        {
-            _activeIndexY = FindAxisIndex(Table.YAxis, YAxisValue.Value);
-        }
-    }
-    
-    private int FindAxisIndex(IReadOnlyList<float> axis, float value)
-    {
-        if (axis.Count < 2) return 0;
-        if (value <= axis[0]) return 0;
-        if (value >= axis[^1]) return axis.Count - 2;
+protected override void OnParametersSet()
+{
+if (Table.Output.Any())
+{
+_min = Table.Output.Min();
+_max = Table.Output.Max();
+}
 
-        for (var i = 0; i < axis.Count - 1; i++)
-        {
-            if (value >= axis[i] && value <= axis[i + 1])
-            {
-                return i;
-            }
-        }
-        return axis.Count - 2;
-    }
+_activeIndexX = null;
+if (XAxisValue.HasValue && Table.XAxis.Any())
+{
+_activeIndexX = FindAxisIndex(Table.XAxis, XAxisValue.Value);
+}
 
-    private bool IsCellActive(int rowIndex, int colIndex)
-    {
-        if (!_activeIndexX.HasValue || !_activeIndexY.HasValue) return false;
+_activeIndexY = null;
+if (YAxisValue.HasValue && Table.YAxis.Any())
+{
+_activeIndexY = FindAxisIndex(Table.YAxis, YAxisValue.Value);
+}
+}
 
-        var isXActive = colIndex >= _activeIndexX.Value && colIndex <= _activeIndexX.Value + 1;
-        var isYActive = rowIndex >= _activeIndexY.Value && rowIndex <= _activeIndexY.Value + 1;
+private int FindAxisIndex(IReadOnlyList<float> axis, float value)
+{
+if (axis.Count < 2) return 0;
 
-        return isXActive && isYActive;
-    }
-    
-    private Task OnValueChanged(int index, object? value)
-    {
-        if (float.TryParse(value?.ToString(), NumberStyles.Any, CultureInfo.InvariantCulture, out var floatValue))
-        {
-            var newOutput = Table.Output.ToList();
-            newOutput[index] = floatValue;
-            return TableChanged.InvokeAsync(Table with { Output = newOutput });
-        }
-        return Task.CompletedTask;
-    }
+for (var i = 0; i < axis.Count - 1; i++)
+{
+var p1 = axis[i];
+var p2 = axis[i + 1];
+if ((value >= p1 && value <= p2) || (value <= p1 && value >= p2))
+{
+return i;
+}
+}
 
-    private void SetView(ViewMode view)
-    {
-        if (_currentView == view) return;
-        _currentView = view;
-    }
+if (Math.Abs(value - axis[0]) < Math.Abs(value - axis[^1]))
+{
+return 0;
+}
+
+return axis.Count - 2;
+}
+
+private bool IsCellActive(int rowIndex, int colIndex)
+{
+if (!_activeIndexX.HasValue || !_activeIndexY.HasValue) return false;
+
+var isXActive = colIndex >= _activeIndexX.Value && colIndex <= _activeIndexX.Value + 1;
+var isYActive = rowIndex >= _activeIndexY.Value && rowIndex <= _activeIndexY.Value + 1;
+
+return isXActive && isYActive;
+}
+
+private Task OnValueChanged(int index, object? value)
+{
+if (float.TryParse(value?.ToString(), NumberStyles.Any, CultureInfo.InvariantCulture, out var floatValue))
+{
+var newOutput = Table.Output.ToList();
+newOutput[index] = floatValue;
+return TableChanged.InvokeAsync(Table with { Output = newOutput });
+}
+return Task.CompletedTask;
+}
+
+private void SetView(ViewMode view)
+{
+if (_currentView == view) return;
+_currentView = view;
+}
 }
 
 <style>
-    .table-3d-container {
-        perspective: 1500px;
-        padding: 2rem;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        min-height: 500px;
-        overflow: hidden;
-    }
-
-    .table-3d-scene {
-        transform-style: preserve-3d;
-        transition: transform 0.1s linear;
-    }
-
-    .table-3d {
-        border-collapse: collapse;
-        transform-style: preserve-3d;
-        color: #fff;
-        font-size: 0.8rem;
-        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
-    }
-
-    .table-3d th, .table-3d td {
-        border: 1px solid rgba(255, 255, 255, 0.2);
-        padding: 0;
-        text-align: center;
-        min-width: 50px;
-        background-color: var(--app-bg-alt-color); /* Fallback */
-        transition: background-color 0.3s;
-    }
-
-    .table-3d th {
-        background-color: #373a40;
-        font-weight: bold;
-        padding: 0.5rem;
-    }
-
-    .table-3d td:hover {
-        background-color: #fff !important;
-        color: #000;
-    }
-
     .table-3d-controls {
         display: flex;
         gap: 2rem;
         justify-content: center;
-        padding: 1rem;
-        background: var(--app-bg-color);
-        border-radius: var(--radius-md);
+        padding: 0 0 1rem 0;
         margin-bottom: 1rem;
-    }
-
-    .control-group {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 0.5rem;
-        font-size: 0.9rem;
-    }
-
-    .ui-slider {
-        width: 200px;
     }
 
     .table-input {
@@ -233,12 +180,18 @@ else
         margin: 0;
     }
 
-    .table-3d td.active-cell {
-        background-color: white !important;
+    .table-responsive td.active-cell {
+        outline: 2px solid var(--primary-color);
+        outline-offset: -2px;
     }
 
-    .table-3d td.active-cell .table-input {
-        color: black;
+    .table-responsive td.active-cell .table-input {
+        color: var(--text-color-headings);
         font-weight: bold;
+    }
+
+    .plot-container {
+        width: 100%;
+        height: 600px;
     }
 </style>
