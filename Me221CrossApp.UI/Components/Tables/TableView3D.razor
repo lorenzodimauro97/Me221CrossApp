@@ -1,4 +1,5 @@
 ﻿@using System.Globalization
+@using ME221CrossApp.UI.Services
 
 <div class="table-3d-controls">
     <div class="control-group">
@@ -119,8 +120,8 @@ else
     {
         if (!_activeIndexX.HasValue || !_activeIndexY.HasValue) return false;
 
-        bool isXActive = colIndex >= _activeIndexX.Value && colIndex <= _activeIndexX.Value + 1;
-        bool isYActive = rowIndex >= _activeIndexY.Value && rowIndex <= _activeIndexY.Value + 1;
+        var isXActive = colIndex >= _activeIndexX.Value && colIndex <= _activeIndexX.Value + 1;
+        var isYActive = rowIndex >= _activeIndexY.Value && rowIndex <= _activeIndexY.Value + 1;
 
         return isXActive && isYActive;
     }

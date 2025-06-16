@@ -73,7 +73,7 @@
     [Parameter, EditorRequired]
     public DriverData? Driver { get; set; }
 
-    private EcuObjectDefinition? Definition => Driver is not null ? (DefinitionService.TryGetObject(Driver.Id, out var def) ? def : null) : null;
+    private EcuObjectDefinition? Definition => Driver is not null ? DefinitionService.TryGetObject(Driver.Id, out var def) ? def : null : null;
 
     private string GetDataLinkName(ushort id)
     {

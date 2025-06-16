@@ -1,17 +1,8 @@
 ﻿namespace ME221CrossApp.Models;
 
-public record CustomViewDefinition
+public record CustomViewDefinition(Guid Id, string Name, string IconName, List<EcuObjectReference> EcuObjects)
 {
-    public Guid Id { get; init; }
-    public string Name { get; set; }
-    public string IconName { get; set; }
-    public List<EcuObjectReference> EcuObjects { get; set; }
-
-    public CustomViewDefinition(Guid id, string name, string iconName, List<EcuObjectReference> ecuObjects)
-    {
-        Id = id;
-        Name = name;
-        IconName = iconName;
-        EcuObjects = ecuObjects;
-    }
+    public string Name { get; set; } = Name;
+    public string IconName { get; set; } = IconName;
+    public List<EcuObjectReference> EcuObjects { get; set; } = EcuObjects;
 }

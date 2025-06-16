@@ -197,7 +197,7 @@ public sealed class TcpDeviceCommunicator(ILogger<TcpDeviceCommunicator> logger)
     private static async Task<byte[]> ReadBytesAsync(Stream stream, int count, CancellationToken token)
     {
         var buffer = new byte[count];
-        int offset = 0;
+        var offset = 0;
         while (offset < count)
         {
             var bytesRead = await stream.ReadAsync(buffer.AsMemory(offset, count - offset), token);

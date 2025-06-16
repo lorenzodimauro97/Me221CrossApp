@@ -1,7 +1,7 @@
 ﻿@page "/settings/views/edit"
 @page "/settings/views/edit/{ViewId:guid}"
 @inject ICustomViewService CustomViewService
-@inject IEcuDefinitionService DefinitionService
+@inject ICompositeDataService CompositeDataService
 @inject NavigationManager NavManager
 @inject ILogger<CustomViewEditor> Logger
 
@@ -11,144 +11,140 @@
 
 @if (_isLoading)
 {
-    <p><em>Loading...</em></p>
+<p><em>Loading...</em></p>
 }
 else if (_view is not null)
 {
-    <div class="ui-card">
-        <div class="ui-card-body">
-            <EditForm Model="_view" OnValidSubmit="HandleSave">
-                <DataAnnotationsValidator />
-                <div class="form-group">
-                    <label for="viewName">View Name</label>
-                    <InputText id="viewName" class="ui-input" @bind-Value="_view.Name" />
-                    <ValidationMessage For="@(() => _view.Name)" />
-                </div>
-                <div class="form-group">
-                    <label for="viewIcon">Icon</label>
-                    <div class="icon-selector-group">
-                        <InputSelect id="viewIcon" class="ui-select" @bind-Value="_view.IconName">
-                            @foreach (var iconName in _iconNames)
-                            {
-                                <option value="@iconName">@iconName</option>
-                            }
-                        </InputSelect>
-                        <span class="icon-preview">
+<div class="ui-card">
+    <div class="ui-card-body">
+        <EditForm Model="_view" OnValidSubmit="HandleSave">
+            <DataAnnotationsValidator />
+            <div class="form-group">
+                <label for="viewName">View Name</label>
+                <InputText id="viewName" class="ui-input" @bind-Value="_view.Name" />
+                <ValidationMessage For="@(() => _view.Name)" />
+            </div>
+            <div class="form-group">
+                <label for="viewIcon">Icon</label>
+                <div class="icon-selector-group">
+                    <InputSelect id="viewIcon" class="ui-select" @bind-Value="_view.IconName">
+                        @foreach (var iconName in _iconNames)
+                        {
+                        <option value="@iconName">@iconName</option>
+                        }
+                    </InputSelect>
+                    <span class="icon-preview">
                             <TablerIcon OutlineIcon="SelectedIconPreview" Size="28px" />
                         </span>
-                    </div>
                 </div>
-
-                <div class="form-group">
-                    <label for="objectSearch">Search ECU Objects</label>
-                    <input type="search" id="objectSearch" class="ui-input" placeholder="Search by name..." @bind="_searchTerm" @bind:event="oninput" />
-                </div>
-
-                <div class="form-group">
-                    <div class="object-selection-container">
-                        @if (FilteredObjects.Any())
-                        {
-                            @foreach (var group in FilteredObjects.GroupBy(o => o.ObjectType).OrderBy(g => g.Key))
-                            {
-                                <h4>@group.Key</h4>
-                                <div class="object-grid">
-                                    @foreach (var obj in group.OrderBy(o => o.Name))
-                                    {
-                                        <div class="checkbox-item">
-                                            <input type="checkbox" id="obj-@obj.Id" checked="@IsObjectSelected(obj.Id)" @onchange="(e) => ToggleObjectSelection(obj, (bool)(e.Value ?? false))" />
-                                            <label for="obj-@obj.Id">@obj.Name</label>
-                                        </div>
-                                    }
-                                </div>
-                            }
-                        }
-                        else
-                        {
-                            <p><em>No ECU objects found matching your search.</em></p>
-                        }
-                    </div>
-                </div>
-
-            </EditForm>
-        </div>
-        <div class="ui-card-footer">
-            <div class="button-group">
-                <button class="ui-button" @onclick="HandleSave">Save</button>
-                <button class="ui-button-secondary" @onclick="@(() => NavManager.NavigateTo("/settings"))">Cancel</button>
             </div>
+
+            <div class="form-group">
+                <label for="objectSearch">Search ECU Objects</label>
+                <input type="search" id="objectSearch" class="ui-input" placeholder="Search by name..." @bind="_searchTerm" @bind:event="oninput" />
+            </div>
+
+            <div class="form-group">
+                <div class="object-selection-container">
+                    @if (FilteredObjects.Any())
+                    {
+                    @foreach (var group in FilteredObjects.GroupBy(o => o.ObjectType).OrderBy(g => g.Key))
+                    {
+                    <h4>@group.Key</h4>
+                    <div class="object-grid">
+                        @foreach (var obj in group.OrderBy(o => o.Name))
+                        {
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="obj-@obj.Id" checked="@IsObjectSelected(obj.Id)" @onchange="(e) => ToggleObjectSelection(obj, (bool)(e.Value ?? false))" />
+                            <label for="obj-@obj.Id">@obj.Name</label>
+                        </div>
+                        }
+                    </div>
+                    }
+                    }
+                    else
+                    {
+                    <p><em>No ECU objects found matching your search.</em></p>
+                    }
+                </div>
+            </div>
+
+        </EditForm>
+    </div>
+    <div class="ui-card-footer">
+        <div class="button-group">
+            <button class="ui-button" @onclick="HandleSave">Save</button>
+            <button class="ui-button-secondary" @onclick="@(() => NavManager.NavigateTo("/settings"))">Cancel</button>
         </div>
     </div>
+</div>
 }
 
 @code {
-    [Parameter]
-    public Guid? ViewId { get; set; }
+[Parameter]
+public Guid? ViewId { get; set; }
 
-    private CustomViewDefinition? _view;
-    private bool _isLoading = true;
-    private List<EcuObjectDefinition> _allObjects = [];
-    private List<string> _iconNames = [];
-    private string _searchTerm = string.Empty;
+private CustomViewDefinition? _view;
+private bool _isLoading = true;
+private IReadOnlyList<EcuObjectDefinition> _allObjects = [];
+private List<string> _iconNames = [];
+private string _searchTerm = string.Empty;
 
-    private bool IsNew => ViewId is null;
-    
-    private IEnumerable<EcuObjectDefinition> FilteredObjects =>
-        string.IsNullOrWhiteSpace(_searchTerm)
-            ? _allObjects
-            : _allObjects.Where(o => o.Name.Contains(_searchTerm, StringComparison.OrdinalIgnoreCase));
+private bool IsNew => ViewId is null;
 
-    private TablerIconOutlineName SelectedIconPreview =>
-        Enum.TryParse<TablerIconOutlineName>(_view?.IconName, true, out var icon) 
-            ? icon 
-            : TablerIconOutlineName.None;
+private IEnumerable<EcuObjectDefinition> FilteredObjects =>
+string.IsNullOrWhiteSpace(_searchTerm)
+? _allObjects
+: _allObjects.Where(o => o.Name.Contains(_searchTerm, StringComparison.OrdinalIgnoreCase));
 
-    protected override async Task OnInitializedAsync()
-    {
-        _iconNames = Enum.GetNames<TablerIconOutlineName>().OrderBy(n => n).ToList();
+private TablerIconOutlineName SelectedIconPreview =>
+Enum.TryParse<TablerIconOutlineName>(_view?.IconName, true, out var icon)
+? icon
+: TablerIconOutlineName.None;
 
-        var def = DefinitionService.GetDefinition();
-        if (def?.EcuObjects is not null)
-        {
-            _allObjects = def.EcuObjects.Values.ToList();
-        }
+protected override async Task OnInitializedAsync()
+{
+_iconNames = Enum.GetNames<TablerIconOutlineName>().OrderBy(n => n).ToList();
 
-        if (IsNew)
-        {
-            _view = new CustomViewDefinition(Guid.NewGuid(), "New View", nameof(TablerIconOutlineName.Dashboard), []);
-        }
-        else
-        {
-            _view = await CustomViewService.GetCustomViewByIdAsync(ViewId!.Value);
-        }
+_allObjects = await CompositeDataService.GetAllEcuObjectDefinitionsAsync();
 
-        _isLoading = false;
-    }
+if (IsNew)
+{
+_view = new CustomViewDefinition(Guid.NewGuid(), "New View", nameof(TablerIconOutlineName.Dashboard), []);
+}
+else
+{
+_view = await CustomViewService.GetCustomViewByIdAsync(ViewId!.Value);
+}
 
-    private bool IsObjectSelected(ushort id) => _view?.EcuObjects.Any(o => o.Id == id) ?? false;
+_isLoading = false;
+}
 
-    private void ToggleObjectSelection(EcuObjectDefinition obj, bool isSelected)
-    {
-        if (_view is null) return;
+private bool IsObjectSelected(ushort id) => _view?.EcuObjects.Any(o => o.Id == id) ?? false;
 
-        var existing = _view.EcuObjects.FirstOrDefault(o => o.Id == obj.Id);
-        if (isSelected && existing is null)
-        {
-            _view.EcuObjects.Add(new EcuObjectReference(obj.Id, obj.Name, obj.ObjectType));
-        }
-        else if (!isSelected && existing is not null)
-        {
-            _view.EcuObjects.Remove(existing);
-        }
-    }
+private void ToggleObjectSelection(EcuObjectDefinition obj, bool isSelected)
+{
+if (_view is null) return;
 
-    private async Task HandleSave()
-    {
-        if (_view is not null)
-        {
-            await CustomViewService.SaveCustomViewAsync(_view);
-            NavManager.NavigateTo("/settings");
-        }
-    }
+var existing = _view.EcuObjects.FirstOrDefault(o => o.Id == obj.Id);
+if (isSelected && existing is null)
+{
+_view.EcuObjects.Add(new EcuObjectReference(obj.Id, obj.Name, obj.ObjectType));
+}
+else if (!isSelected && existing is not null)
+{
+_view.EcuObjects.Remove(existing);
+}
+}
+
+private async Task HandleSave()
+{
+if (_view is not null)
+{
+await CustomViewService.SaveCustomViewAsync(_view);
+NavManager.NavigateTo("/settings");
+}
+}
 }
 
 <style>

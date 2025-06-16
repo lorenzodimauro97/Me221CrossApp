@@ -50,18 +50,11 @@
       <AndroidCreatePackagePerAbi>True</AndroidCreatePackagePerAbi>
       <AndroidUseAapt2>True</AndroidUseAapt2>
       <AndroidKeyStore>True</AndroidKeyStore>
-      <AndroidSigningStorePass>criceto</AndroidSigningStorePass>
-      <AndroidSigningKeyAlias>scippo97</AndroidSigningKeyAlias>
-      <AndroidSigningKeyPass>criceto</AndroidSigningKeyPass>
     </PropertyGroup>
 
     <PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Debug|net10.0-android|AnyCPU'">
       <AndroidCreatePackagePerAbi>True</AndroidCreatePackagePerAbi>
       <AndroidUseAapt2>True</AndroidUseAapt2>
-      <AndroidKeyStore>True</AndroidKeyStore>
-      <AndroidSigningStorePass>criceto</AndroidSigningStorePass>
-      <AndroidSigningKeyAlias>scippo97</AndroidSigningKeyAlias>
-      <AndroidSigningKeyPass>criceto</AndroidSigningKeyPass>
     </PropertyGroup>
 
     <ItemGroup>
@@ -97,17 +90,6 @@
     <ItemGroup>
       <ProjectReference Include="..\ME221CrossApp.Models\ME221CrossApp.Models.csproj" />
       <ProjectReference Include="..\ME221CrossApp.Services\ME221CrossApp.Services.csproj" />
-    </ItemGroup>
-
-    <ItemGroup>
-      <Content Update="Components\Tables\TableView3D.razor.css">
-        <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
-      </Content>
-    </ItemGroup>
-
-    <ItemGroup>
-      <RazorComponent Include="Components\Pages\CustomViewPage.razor.css" />
-      <RazorComponent Include="Components\Shared\LineChart.razor.css" />
     </ItemGroup>
 
 </Project>

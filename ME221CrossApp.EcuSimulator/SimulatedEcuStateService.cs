@@ -30,9 +30,9 @@ public class SimulatedEcuStateService(IEcuDefinitionService definitionService, I
             switch (ecuObject.ObjectType)
             {
                 case "Table":
-                    byte rows = ecuObject.Rows ?? 1;
-                    byte cols = ecuObject.Cols ?? 16;
-                    bool is3D = rows > 1;
+                    var rows = ecuObject.Rows ?? 1;
+                    var cols = ecuObject.Cols ?? 16;
+                    var is3D = rows > 1;
                     
                     var xAxis = Enumerable.Range(0, cols).Select(i => i * 500f).ToArray();
                     var yAxis = is3D ? Enumerable.Range(0, rows).Select(i => i * 10f).ToArray() : [];
@@ -127,7 +127,7 @@ public class SimulatedEcuStateService(IEcuDefinitionService definitionService, I
             }
             else
             {
-                float phase = i * 0.2f;
+                var phase = i * 0.2f;
                 float amplitude = 50 + (i % 5 * 20);
                 value = (float)(Math.Sin(_angle + phase) * amplitude + amplitude);
             }

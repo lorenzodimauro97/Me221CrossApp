@@ -1,5 +1,6 @@
 ﻿using ME221CrossApp.Services;
 using Me221CrossApp.UI.Services;
+using ME221CrossApp.UI.Services;
 using Microsoft.Extensions.Logging;
 using Serilog;
 using Serilog.Events;
@@ -62,6 +63,10 @@ namespace ME221CrossApp.UI
             builder.Services.AddSingleton<CommunicationMux>();
             builder.Services.AddSingleton<ConnectionStateService>();
             builder.Services.AddSingleton<ICustomViewService, CustomViewService>();
+            builder.Services.AddSingleton<IAppSettingService, AppSettingService>();
+            builder.Services.AddSingleton<IGpsService, GpsService>();
+            builder.Services.AddSingleton<IGearCalculationService, GearCalculationService>();
+            builder.Services.AddSingleton<ICompositeDataService, CompositeDataService>();
             
             builder.Services.AddSingleton<IEcuDefinitionService, EcuDefinitionService>();
             builder.Services.AddSingleton<IEcuInteractionService>(sp =>

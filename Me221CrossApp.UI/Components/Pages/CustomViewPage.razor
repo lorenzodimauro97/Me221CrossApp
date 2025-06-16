@@ -1,6 +1,7 @@
 ﻿@page "/view/{ViewId:guid}"
 @inject ICustomViewService CustomViewService
 @inject IEcuInteractionService EcuService
+@inject ICompositeDataService CompositeDataService
 @inject IEcuDefinitionService DefinitionService
 @inject ConnectionStateService ConnState
 @inject ILogger<CustomViewPage> Logger
@@ -161,7 +162,7 @@ else
             {
                 try
                 {
-                    _dataLinks = await EcuService.GetDataLinkListAsync(true);
+                    _dataLinks = await CompositeDataService.GetAvailableDataLinksAsync();
                 }
                 catch (Exception ex)
                 {
@@ -169,7 +170,7 @@ else
                     _errorMessage = "Could not load data links needed for driver editing.";
                 }
             }
-            await StartStreamingAsync();
+            _ = StartStreamingAsync();
         }
         
         _isLoading = false;
@@ -397,7 +398,7 @@ else
         
         try
         {
-            await foreach (var dataPoints in EcuService.StreamRealtimeDataAsync(_streamingCts.Token))
+            await foreach (var dataPoints in CompositeDataService.StreamCompositeDataAsync(_streamingCts.Token))
             {
                 bool updated = false;
                 foreach (var dp in dataPoints)
@@ -443,3 +444,20 @@ else
         }
     }
 }
+
+<style>
+    .datalink-grid {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 1rem;
+        margin-bottom: 1rem;
+    }
+
+    .datalink-grid > * {
+        flex: 1 1 200px;
+    }
+
+    .full-width-item-container {
+        margin-bottom: 1rem;
+    }
+</style>

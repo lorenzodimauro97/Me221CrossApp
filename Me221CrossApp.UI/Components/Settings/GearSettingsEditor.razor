@@ -1,0 +1,140 @@
+﻿@inject IAppSettingService AppSettingService
+@inject ILogger<GearSettingsEditor> Logger
+
+<div class="ui-card">
+    <div class="ui-card-header">Gear & Drivetrain Settings</div>
+    <div class="ui-card-body">
+        @if (_isLoading)
+        {
+            <p><em>Loading settings...</em></p>
+        }
+        else if (_settings is not null)
+        {
+            <div class="settings-grid">
+                <div class="form-group">
+                    <label for="finalDrive">Final Drive Ratio</label>
+                    <input type="number" id="finalDrive" class="ui-input" @bind="_settings.FinalDriveRatio" />
+                </div>
+                <div class="form-group">
+                    <label for="tireCirc">Tire Circumference (meters)</label>
+                    <input type="number" id="tireCirc" class="ui-input" @bind="_settings.TireCircumferenceMeters" />
+                </div>
+                <div class="form-group">
+                    <label for="confidence">Gear Confidence Threshold (KPH)</label>
+                    <input type="number" id="confidence" class="ui-input" @bind="_settings.GearConfidenceThresholdKph" />
+                </div>
+                
+                <div class="form-group gear-ratios-group">
+                    <label>Gear Ratios</label>
+                    <div class="gear-ratio-list">
+                        @for (var i = 0; i < _settings.GearRatios.Count; i++)
+                        {
+                            var index = i;
+                            <div class="ui-input-group">
+                                <span class="gear-label">Gear @(index + 1)</span>
+                                <input type="number" step="any" class="ui-input" value="@_settings.GearRatios[index]"
+                                       @onchange="(e) => OnGearRatioChanged(index, e.Value)" />
+                            </div>
+                        }
+                    </div>
+                    <div class="button-group">
+                        <button class="ui-button-sm" @onclick="AddGearRatio">Add Gear</button>
+                        @if (_settings.GearRatios.Count > 1)
+                        {
+                            <button class="ui-button-danger-sm" @onclick="RemoveLastGearRatio">Remove Last Gear</button>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+    <div class="ui-card-footer">
+        <button class="ui-button" @onclick="SaveSettings" disabled="@_isLoading">Save Settings</button>
+    </div>
+</div>
+
+@code {
+    private GearSettings? _settings;
+    private bool _isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _settings = await AppSettingService.GetGearSettingsAsync();
+        _isLoading = false;
+    }
+
+    private void OnGearRatioChanged(int index, object? value)
+    {
+        if (_settings is not null && float.TryParse(value?.ToString(), out var floatValue))
+        {
+            _settings.GearRatios[index] = floatValue;
+        }
+    }
+
+    private void AddGearRatio()
+    {
+        _settings?.GearRatios.Add(1.0f);
+    }
+
+    private void RemoveLastGearRatio()
+    {
+        if (_settings?.GearRatios.Count > 1)
+        {
+            _settings.GearRatios.RemoveAt(_settings.GearRatios.Count - 1);
+        }
+    }
+
+    private async Task SaveSettings()
+    {
+        if (_settings is not null)
+        {
+            _isLoading = true;
+            await AppSettingService.SaveGearSettingsAsync(_settings);
+            _isLoading = false;
+        }
+    }
+}
+
+<style>
+    .settings-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 1.5rem;
+    }
+
+    .form-group {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+    
+    .gear-ratios-group {
+        grid-column: 1 / -1;
+    }
+    
+    .gear-ratio-list {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 1rem;
+    }
+    
+    .gear-label {
+        font-weight: 500;
+        white-space: nowrap;
+        padding-right: 0.5rem;
+    }
+    
+    .ui-input-group > .gear-label {
+        flex-grow: 0;
+    }
+    
+    .ui-input-group > .ui-input {
+        flex-grow: 1;
+    }
+
+    @@media (min-width: 768px) {
+        .settings-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+    }
+</style>

@@ -1,6 +1,7 @@
 ﻿@page "/drivers"
 @inject ConnectionStateService ConnState
 @inject IEcuInteractionService EcuService
+@inject ICompositeDataService CompositeDataService
 @inject IEcuDefinitionService DefinitionService
 @inject ILogger<Drivers> Logger
 
@@ -126,7 +127,7 @@ else
             {
                 var allObjects = await EcuService.GetObjectListAsync();
                 _drivers = allObjects.Where(o => o.ObjectType == "Driver").OrderBy(t => t.Name).ToList();
-                _dataLinks = await EcuService.GetDataLinkListAsync();
+                _dataLinks = await CompositeDataService.GetAvailableDataLinksAsync();
             }
             catch (Exception ex)
             {

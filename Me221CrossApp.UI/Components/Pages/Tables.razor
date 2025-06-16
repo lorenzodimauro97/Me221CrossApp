@@ -3,6 +3,7 @@
 @inject IEcuInteractionService EcuService
 @inject IEcuDefinitionService DefinitionService
 @inject ILogger<Tables> Logger
+@using ME221CrossApp.UI.Services
 @implements IAsyncDisposable
 
 <PageTitle>Table Viewer</PageTitle>
@@ -213,7 +214,7 @@ else
         {
             await foreach (var dataPoints in EcuService.StreamRealtimeDataAsync(_streamingCts.Token))
             {
-                bool updated = false;
+                var updated = false;
                 if (tableDef.Input0LinkId.HasValue)
                 {
                     var dp = dataPoints.FirstOrDefault(d => d.Id == tableDef.Input0LinkId.Value);
@@ -255,7 +256,7 @@ else
         }
         
         var sb = new System.Text.StringBuilder();
-        bool isHrtTable = _selectedTableData.Name.Contains("HRT", StringComparison.OrdinalIgnoreCase);
+        var isHrtTable = _selectedTableData.Name.Contains("HRT", StringComparison.OrdinalIgnoreCase);
 
         if (_xAxisValue.HasValue)
         {

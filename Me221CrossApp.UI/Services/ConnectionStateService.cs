@@ -1,7 +1,7 @@
 ﻿using ME221CrossApp.Models;
 using Microsoft.Extensions.Logging;
 
-namespace Me221CrossApp.UI.Services;
+namespace ME221CrossApp.UI.Services;
 
 public class ConnectionStateService(ILogger<ConnectionStateService> logger)
 {

@@ -469,13 +469,13 @@ namespace ME221CrossApp
             }
 
             Console.WriteLine("\nAvailable devices/ports:");
-            for (int i = 0; i < portNames.Count; i++)
+            for (var i = 0; i < portNames.Count; i++)
             {
                 Console.WriteLine($"{i + 1}: {portNames[i]}");
             }
         
             Console.Write("Select a device/port: ");
-            if (int.TryParse(Console.ReadLine(), out int choice) && choice > 0 && choice <= portNames.Count)
+            if (int.TryParse(Console.ReadLine(), out var choice) && choice > 0 && choice <= portNames.Count)
             {
                 return portNames[choice - 1].Name;
             }
@@ -487,14 +487,14 @@ namespace ME221CrossApp
         private Operation? SelectOperation()
         {
             Console.WriteLine("\nAvailable operations:");
-            for (int i = 0; i < _operations.Count; i++)
+            for (var i = 0; i < _operations.Count; i++)
             {
                 Console.WriteLine($"{i + 1}: {_operations[i].Name}");
             }
             Console.WriteLine("0: Exit");
 
             Console.Write("Select an operation: ");
-            if (int.TryParse(Console.ReadLine(), out int choice) && choice >= 0 && choice <= _operations.Count)
+            if (int.TryParse(Console.ReadLine(), out var choice) && choice >= 0 && choice <= _operations.Count)
             {
                 if (choice == 0) return null;
                 return _operations[choice - 1];

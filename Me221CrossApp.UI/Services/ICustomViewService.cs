@@ -1,6 +1,6 @@
 ﻿using ME221CrossApp.Models;
 
-namespace Me221CrossApp.UI.Services;
+namespace ME221CrossApp.UI.Services;
 
 public interface ICustomViewService
 {

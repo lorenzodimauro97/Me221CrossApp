@@ -2,6 +2,7 @@
 @inject IDeviceDiscoveryService DeviceDiscoveryService
 @inject CommunicationMux CommMux
 @inject IEcuInteractionService EcuService
+@inject ICompositeDataService CompositeDataService
 @inject IEcuDefinitionService DefinitionService
 @inject NavigationManager NavManager
 @inject ConnectionStateService ConnState
@@ -181,7 +182,7 @@ else
         Logger.LogInformation("Starting real-time data stream.");
         try
         {
-            await foreach (var dataPoints in EcuService.StreamRealtimeDataAsync(_streamingCts.Token))
+            await foreach (var dataPoints in CompositeDataService.StreamCompositeDataAsync(_streamingCts.Token))
             {
                 foreach (var dp in dataPoints)
                 {

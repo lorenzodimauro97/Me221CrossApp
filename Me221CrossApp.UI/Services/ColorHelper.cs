@@ -1,4 +1,4 @@
-﻿namespace Me221CrossApp.UI.Services;
+﻿namespace ME221CrossApp.UI.Services;
 
 public static class ColorHelper
 {
