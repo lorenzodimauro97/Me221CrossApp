@@ -117,12 +117,20 @@ public class SimulatedEcuStateService(IEcuDefinitionService definitionService, I
         if (_angle > 2 * Math.PI) _angle = 0;
 
         var dataPoints = _realtimeData.Values.ToList();
-        for (int i = 0; i < dataPoints.Count; i++)
+        for (var i = 0; i < dataPoints.Count; i++)
         {
             var dp = dataPoints[i];
-            float phase = i * 0.2f;
-            float amplitude = 50 + (i % 5 * 20);
-            float value = (float)(Math.Sin(_angle + phase) * amplitude + amplitude);
+            float value;
+            if (dp.Name.Equals("RPM", StringComparison.OrdinalIgnoreCase))
+            {
+                value = (float)(Math.Sin(_angle) * 3100 + 3900);
+            }
+            else
+            {
+                float phase = i * 0.2f;
+                float amplitude = 50 + (i % 5 * 20);
+                value = (float)(Math.Sin(_angle + phase) * amplitude + amplitude);
+            }
             _realtimeData[dp.Id] = dp with { Value = value };
         }
         

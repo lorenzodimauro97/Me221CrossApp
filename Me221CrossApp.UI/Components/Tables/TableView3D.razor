@@ -35,7 +35,8 @@
                                 var colIndex = j;
                                 var index = rowIndex * Table.Cols + colIndex;
                                 var val = Table.Output[index];
-                                <td style="background-color: @ColorHelper.GetColorForValue(val, _min, _max)">
+                                <td class="@(IsCellActive(rowIndex, colIndex) ? "active-cell" : "")"
+                                    style="background-color: @ColorHelper.GetColorForValue(val, _min, _max)">
                                     <input type="number"
                                            step="any"
                                            class="table-input"
@@ -62,12 +63,20 @@ else
     private ViewMode _currentView = ViewMode.Table;
     
     private float _min, _max;
+    private int? _activeIndexX;
+    private int? _activeIndexY;
 
     [Parameter, EditorRequired]
     public TableData Table { get; set; } = null!;
 
     [Parameter]
     public EventCallback<TableData> TableChanged { get; set; }
+    
+    [Parameter]
+    public float? XAxisValue { get; set; }
+
+    [Parameter]
+    public float? YAxisValue { get; set; }
 
     protected override void OnParametersSet()
     {
@@ -76,6 +85,44 @@ else
             _min = Table.Output.Min();
             _max = Table.Output.Max();
         }
+
+        _activeIndexX = null;
+        if (XAxisValue.HasValue && Table.XAxis.Any())
+        {
+            _activeIndexX = FindAxisIndex(Table.XAxis, XAxisValue.Value);
+        }
+
+        _activeIndexY = null;
+        if (YAxisValue.HasValue && Table.YAxis.Any())
+        {
+            _activeIndexY = FindAxisIndex(Table.YAxis, YAxisValue.Value);
+        }
+    }
+    
+    private int FindAxisIndex(IReadOnlyList<float> axis, float value)
+    {
+        if (axis.Count < 2) return 0;
+        if (value <= axis[0]) return 0;
+        if (value >= axis[^1]) return axis.Count - 2;
+
+        for (var i = 0; i < axis.Count - 1; i++)
+        {
+            if (value >= axis[i] && value <= axis[i + 1])
+            {
+                return i;
+            }
+        }
+        return axis.Count - 2;
+    }
+
+    private bool IsCellActive(int rowIndex, int colIndex)
+    {
+        if (!_activeIndexX.HasValue || !_activeIndexY.HasValue) return false;
+
+        bool isXActive = colIndex >= _activeIndexX.Value && colIndex <= _activeIndexX.Value + 1;
+        bool isYActive = rowIndex >= _activeIndexY.Value && rowIndex <= _activeIndexY.Value + 1;
+
+        return isXActive && isYActive;
     }
     
     private Task OnValueChanged(int index, object? value)
@@ -95,3 +142,102 @@ else
         _currentView = view;
     }
 }
+
+<style>
+    .table-3d-container {
+        perspective: 1500px;
+        padding: 2rem;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 500px;
+        overflow: hidden;
+    }
+
+    .table-3d-scene {
+        transform-style: preserve-3d;
+        transition: transform 0.1s linear;
+    }
+
+    .table-3d {
+        border-collapse: collapse;
+        transform-style: preserve-3d;
+        color: #fff;
+        font-size: 0.8rem;
+        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+    }
+
+    .table-3d th, .table-3d td {
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        padding: 0;
+        text-align: center;
+        min-width: 50px;
+        background-color: var(--app-bg-alt-color); /* Fallback */
+        transition: background-color 0.3s;
+    }
+
+    .table-3d th {
+        background-color: #373a40;
+        font-weight: bold;
+        padding: 0.5rem;
+    }
+
+    .table-3d td:hover {
+        background-color: #fff !important;
+        color: #000;
+    }
+
+    .table-3d-controls {
+        display: flex;
+        gap: 2rem;
+        justify-content: center;
+        padding: 1rem;
+        background: var(--app-bg-color);
+        border-radius: var(--radius-md);
+        margin-bottom: 1rem;
+    }
+
+    .control-group {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.9rem;
+    }
+
+    .ui-slider {
+        width: 200px;
+    }
+
+    .table-input {
+        width: 100%;
+        background-color: transparent;
+        border: none;
+        color: #ffffff;
+        text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.7);
+        text-align: center;
+        font-size: inherit;
+        padding: 0.5rem;
+        -moz-appearance: textfield;
+    }
+
+    .table-input:focus {
+        outline: 1px solid var(--accent-color);
+        background-color: rgba(0, 0, 0, 0.2);
+    }
+
+    .table-input::-webkit-outer-spin-button,
+    .table-input::-webkit-inner-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+    }
+
+    .table-3d td.active-cell {
+        background-color: white !important;
+    }
+
+    .table-3d td.active-cell .table-input {
+        color: black;
+        font-weight: bold;
+    }
+</style>

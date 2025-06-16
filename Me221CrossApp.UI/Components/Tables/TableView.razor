@@ -2,11 +2,11 @@
 {
     @if (Table.Rows > 1)
     {
-        <TableView3D Table="Table" TableChanged="TableChanged" />
+        <TableView3D Table="Table" TableChanged="TableChanged" XAxisValue="XAxisValue" YAxisValue="YAxisValue" />
     }
     else
     {
-        <TableView2D Table="Table" TableChanged="TableChanged" />
+        <TableView2D Table="Table" TableChanged="TableChanged" XAxisValue="XAxisValue" />
     }
 }
 else
@@ -20,4 +20,10 @@ else
 
     [Parameter]
     public EventCallback<TableData> TableChanged { get; set; }
+
+    [Parameter]
+    public float? XAxisValue { get; set; }
+
+    [Parameter]
+    public float? YAxisValue { get; set; }
 }

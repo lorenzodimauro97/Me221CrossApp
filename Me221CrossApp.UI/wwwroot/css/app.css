@@ -360,3 +360,15 @@ a:hover {
 .grid-row-no-gap {
     gap: 0;
 }
+
+.debug-info {
+    font-family: monospace;
+    font-size: 0.9rem;
+    background-color: var(--app-bg-color);
+    padding: var(--spacing-sm);
+    border-radius: var(--radius-sm);
+}
+
+.debug-info > div {
+    padding-bottom: 0.25rem;
+}

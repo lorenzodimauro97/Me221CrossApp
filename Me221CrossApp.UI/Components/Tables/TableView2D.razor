@@ -13,7 +13,7 @@
                 @for (var i = 0; i < Table.Output.Count; i++)
                 {
                     var index = i;
-                    <tr>
+                    <tr class="@(IsCellActive(index) ? "active-row" : "")">
                         <td>@Table.XAxis[index].ToString("F1")</td>
                         <td style="background-color: @ColorHelper.GetColorForValue(Table.Output[index], _min, _max)">
                             <input type="number"
@@ -39,28 +39,78 @@
 
     [Parameter]
     public EventCallback<TableData> TableChanged { get; set; }
+    
+    [Parameter]
+    public float? XAxisValue { get; set; }
 
     private float _min, _max;
     private IReadOnlyList<PointF> _chartData = [];
+    private int? _activeIndex;
+    private TableData? _cachedTable;
 
     protected override void OnParametersSet()
     {
-        if (Table.Output.Any())
+        if (Table != _cachedTable)
         {
-            _min = Table.Output.Min();
-            _max = Table.Output.Max();
+            _cachedTable = Table;
+            if (Table.Output.Any())
+            {
+                _min = Table.Output.Min();
+                _max = Table.Output.Max();
+            }
+
+            if (Table.XAxis.Any() && Table.Output.Any() && Table.XAxis.Count == Table.Output.Count)
+            {
+                _chartData = Table.XAxis
+                    .Zip(Table.Output, (x, y) => new PointF(x, y))
+                    .ToList();
+            }
+            else
+            {
+                _chartData = [];
+            }
         }
 
-        if (Table.XAxis.Any() && Table.Output.Any() && Table.XAxis.Count == Table.Output.Count)
+        _activeIndex = null;
+        if (XAxisValue.HasValue)
         {
-            _chartData = Table.XAxis
-                .Zip(Table.Output, (x, y) => new PointF(x, y))
-                .ToList();
+            bool isHrtTable = Table.Name.Contains("HRT", StringComparison.OrdinalIgnoreCase);
+            var axisToSearch = isHrtTable ? Table.Output : Table.XAxis;
+            
+            if (axisToSearch.Any())
+            {
+                _activeIndex = FindAxisIndex(axisToSearch, XAxisValue.Value);
+            }
         }
-        else
+    }
+    
+    private bool IsCellActive(int index)
+    {
+        if (!_activeIndex.HasValue || _activeIndex.Value == -1) return false;
+        
+        return index == _activeIndex.Value || index == _activeIndex.Value + 1;
+    }
+
+    private int FindAxisIndex(IReadOnlyList<float> axis, float value)
+    {
+        if (axis.Count < 2) return axis.Count > 0 ? 0 : -1;
+
+        for (var i = 0; i < axis.Count - 1; i++)
         {
-            _chartData = [];
+            var p1 = axis[i];
+            var p2 = axis[i + 1];
+            if ((value >= p1 && value <= p2) || (value <= p1 && value >= p2))
+            {
+                return i;
+            }
         }
+
+        if (Math.Abs(value - axis[0]) < Math.Abs(value - axis[^1]))
+        {
+            return 0;
+        }
+        
+        return axis.Count - 2;
     }
 
     private Task OnValueChanged(int index, object? value)
@@ -74,3 +124,68 @@
         return Task.CompletedTask;
     }
 }
+
+<style>
+    .table-view-2d-container {
+        display: flex;
+        flex-direction: row;
+        gap: 1rem;
+        width: 100%;
+    }
+
+    .table-responsive {
+        flex: 0 0 250px;
+        overflow-y: auto;
+        max-height: 500px;
+    }
+
+    .chart-area {
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+
+    .table-input {
+        width: 100%;
+        background-color: transparent;
+        border: none;
+        color: #ffffff;
+        text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.7);
+        text-align: center;
+        font-size: inherit;
+        padding: 0.25rem;
+        -moz-appearance: textfield;
+    }
+
+    .table-input:focus {
+        outline: 1px solid var(--accent-color);
+        background-color: rgba(0, 0, 0, 0.2);
+    }
+
+    .table-input::-webkit-outer-spin-button,
+    .table-input::-webkit-inner-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+    }
+
+    .table-2d-container {
+        display: flex;
+        flex-direction: row;
+        gap: 1rem;
+        align-items: flex-start;
+    }
+
+    .table-values-container {
+        flex: 0 0 250px;
+        max-height: 400px;
+        overflow-y: auto;
+    }
+
+    tr.active-row td {
+        background-color: white !important;
+    }
+
+    tr.active-row td .table-input {
+        color: black;
+        font-weight: bold;
+    }
+</style>

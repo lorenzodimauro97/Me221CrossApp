@@ -55,7 +55,10 @@ else if (_viewDefinition is not null)
                             <div class="ui-card">
                                 <div class="ui-card-header">@table.Name</div>
                                 <div class="ui-card-body">
-                                    <TableView Table="table" TableChanged="(newTable) => OnTableDataChanged(table.Id, newTable)" />
+                                    <TableView Table="table" 
+                                               TableChanged="(newTable) => OnTableDataChanged(table.Id, newTable)"
+                                               XAxisValue="GetTableAxisValue(table.Id, false)"
+                                               YAxisValue="GetTableAxisValue(table.Id, true)" />
                                 </div>
                                 <div class="ui-card-footer">
                                     <div class="button-group">
@@ -416,6 +419,19 @@ else
         {
             Logger.LogError(ex, "Error in custom view data stream.");
         }
+    }
+    
+    private float? GetTableAxisValue(ushort tableId, bool isYAxis)
+    {
+        if (DefinitionService.TryGetObject(tableId, out var def) && def is not null)
+        {
+            var linkId = isYAxis ? def.Input1LinkId : def.Input0LinkId;
+            if (linkId.HasValue && _realtimeData.TryGetValue(linkId.Value, out var dp))
+            {
+                return dp.Value;
+            }
+        }
+        return null;
     }
 
     public async ValueTask DisposeAsync()

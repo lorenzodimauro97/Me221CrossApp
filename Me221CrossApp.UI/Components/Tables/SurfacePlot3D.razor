@@ -11,6 +11,18 @@
 
     [Parameter, EditorRequired]
     public TableData Table { get; set; } = null!;
+    
+    private TableData? _cachedTable;
+
+    protected override bool ShouldRender()
+    {
+        if (Table != _cachedTable)
+        {
+            _cachedTable = Table;
+            return true;
+        }
+        return false;
+    }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -20,11 +32,7 @@
             await CreatePlot();
             _hasRendered = true;
         }
-    }
-
-    protected override async Task OnParametersSetAsync()
-    {
-        if (_hasRendered && _plotModule is not null)
+        else if (_hasRendered && _plotModule is not null)
         {
             await UpdatePlot();
         }

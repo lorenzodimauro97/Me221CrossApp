@@ -1,7 +1,9 @@
 ﻿@page "/tables"
 @inject ConnectionStateService ConnState
 @inject IEcuInteractionService EcuService
+@inject IEcuDefinitionService DefinitionService
 @inject ILogger<Tables> Logger
+@implements IAsyncDisposable
 
 <PageTitle>Table Viewer</PageTitle>
 
@@ -53,8 +55,25 @@ else
     else if (_selectedTableData is not null)
     {
         <div class="ui-card">
+            <div class="ui-card-header">Debug Info</div>
+            <div class="ui-card-body debug-info">
+                <div><strong>X-Axis Link:</strong> @_xAxisLinkName</div>
+                <div><strong>X-Axis Value:</strong> @_xAxisValue?.ToString("F2") ?? "N/A"</div>
+                @if (_selectedTableData.Rows > 1)
+                {
+                    <div><strong>Y-Axis Link:</strong> @_yAxisLinkName</div>
+                    <div><strong>Y-Axis Value:</strong> @_yAxisValue?.ToString("F2") ?? "N/A"</div>
+                }
+                <div><strong>Affected Cells:</strong> @_activeCellInfo</div>
+            </div>
+        </div>
+        
+        <div class="ui-card">
             <div class="ui-card-body">
-                <TableView Table="_selectedTableData" TableChanged="OnTableDataChanged" />
+                <TableView Table="_selectedTableData" 
+                           TableChanged="OnTableDataChanged" 
+                           XAxisValue="_xAxisValue"
+                           YAxisValue="_yAxisValue" />
             </div>
             <div class="ui-card-footer">
                 <div class="button-group">
@@ -82,6 +101,14 @@ else
     private IReadOnlyList<EcuObjectDefinition> _tables = [];
     private TableData? _selectedTableData;
     private TableData? _originalTableData;
+    
+    private float? _xAxisValue;
+    private float? _yAxisValue;
+    private CancellationTokenSource? _streamingCts;
+    
+    private string? _xAxisLinkName;
+    private string? _yAxisLinkName;
+    private string? _activeCellInfo;
 
     private ushort _selectedTableId;
     private ushort SelectedTableId
@@ -126,6 +153,7 @@ else
     {
         _statusMessage = null;
         _errorMessage = null;
+        await StopStreamingAsync();
 
         if (SelectedTableId == 0)
         {
@@ -143,6 +171,25 @@ else
         {
             _selectedTableData = await EcuService.GetTableAsync(SelectedTableId);
             _originalTableData = _selectedTableData;
+            
+            _xAxisLinkName = "N/A";
+            _yAxisLinkName = "N/A";
+
+            if (_selectedTableData is not null)
+            {
+                if (DefinitionService.TryGetObject(_selectedTableData.Id, out var tableDef) && tableDef is not null)
+                {
+                    if (tableDef.Input0LinkId.HasValue && DefinitionService.TryGetObject(tableDef.Input0LinkId.Value, out var xDef))
+                    {
+                        _xAxisLinkName = xDef?.Name;
+                    }
+                    if (tableDef.Input1LinkId.HasValue && DefinitionService.TryGetObject(tableDef.Input1LinkId.Value, out var yDef))
+                    {
+                        _yAxisLinkName = yDef?.Name;
+                    }
+                }
+                _ = StreamAxisDataAsync();
+            }
         }
         catch (Exception ex)
         {
@@ -154,6 +201,135 @@ else
             _isTableLoading = false;
             await InvokeAsync(StateHasChanged);
         }
+    }
+    
+    private async Task StreamAxisDataAsync()
+    {
+        _streamingCts = new CancellationTokenSource();
+        if (!DefinitionService.TryGetObject(SelectedTableId, out var tableDef) || tableDef is null) return;
+        if (tableDef.Input0LinkId is null && tableDef.Input1LinkId is null) return;
+
+        try
+        {
+            await foreach (var dataPoints in EcuService.StreamRealtimeDataAsync(_streamingCts.Token))
+            {
+                bool updated = false;
+                if (tableDef.Input0LinkId.HasValue)
+                {
+                    var dp = dataPoints.FirstOrDefault(d => d.Id == tableDef.Input0LinkId.Value);
+                    if (dp is not null && _xAxisValue != dp.Value)
+                    {
+                        _xAxisValue = dp.Value;
+                        updated = true;
+                    }
+                }
+                if (tableDef.Input1LinkId.HasValue)
+                {
+                    var dp = dataPoints.FirstOrDefault(d => d.Id == tableDef.Input1LinkId.Value);
+                    if (dp is not null && _yAxisValue != dp.Value)
+                    {
+                        _yAxisValue = dp.Value;
+                        updated = true;
+                    }
+                }
+                if (updated)
+                {
+                    UpdateActiveCellInfo();
+                    await InvokeAsync(StateHasChanged);
+                }
+            }
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error streaming axis data for table {TableId}", SelectedTableId);
+        }
+    }
+
+    private void UpdateActiveCellInfo()
+    {
+        if (_selectedTableData is null)
+        {
+            _activeCellInfo = "Table data not loaded.";
+            return;
+        }
+        
+        var sb = new System.Text.StringBuilder();
+        bool isHrtTable = _selectedTableData.Name.Contains("HRT", StringComparison.OrdinalIgnoreCase);
+
+        if (_xAxisValue.HasValue)
+        {
+            var axisToSearch = isHrtTable ? _selectedTableData.Output : _selectedTableData.XAxis;
+            var axisName = isHrtTable ? "Value" : "X-Axis";
+            var linkName = _xAxisLinkName;
+
+            if(axisToSearch.Any())
+            {
+                var index = FindAxisIndex(axisToSearch, _xAxisValue.Value);
+                if (index != -1 && axisToSearch.Count > 1 && index < axisToSearch.Count - 1)
+                {
+                    sb.Append($"{axisName} from '{linkName}' ({_xAxisValue:F2}) is between {axisToSearch[index]:F2} (idx {index}) and {axisToSearch[index + 1]:F2} (idx {index + 1}). ");
+                }
+                else if (index != -1)
+                {
+                    sb.Append($"{axisName} from '{linkName}' ({_xAxisValue:F2}) is at or beyond cell (idx {index}). ");
+                }
+            }
+        }
+
+        if (_yAxisValue.HasValue && _selectedTableData.YAxis.Any())
+        {
+            var axis = _selectedTableData.YAxis;
+            var index = FindAxisIndex(axis, _yAxisValue.Value);
+            if (index != -1 && axis.Count > 1 && index < axis.Count - 1)
+            {
+                sb.Append($"Y-Axis from '{_yAxisLinkName}' ({_yAxisValue:F2}) is between {axis[index]:F2} (idx {index}) and {axis[index + 1]:F2} (idx {index + 1}).");
+            }
+            else if (index != -1)
+            {
+                sb.Append($"Y-Axis from '{_yAxisLinkName}' ({_yAxisValue:F2}) is at or beyond cell (idx {index}).");
+            }
+        }
+        _activeCellInfo = sb.ToString().Trim();
+        if (string.IsNullOrEmpty(_activeCellInfo))
+        {
+            _activeCellInfo = "N/A";
+        }
+    }
+    
+    private int FindAxisIndex(IReadOnlyList<float> axis, float value)
+    {
+        if (axis.Count < 2) return axis.Count > 0 ? 0 : -1;
+
+        for (var i = 0; i < axis.Count - 1; i++)
+        {
+            var p1 = axis[i];
+            var p2 = axis[i + 1];
+            if ((value >= p1 && value <= p2) || (value <= p1 && value >= p2))
+            {
+                return i;
+            }
+        }
+
+        if (Math.Abs(value - axis[0]) < Math.Abs(value - axis[^1]))
+        {
+            return 0;
+        }
+        
+        return axis.Count - 2;
+    }
+
+    private async Task StopStreamingAsync()
+    {
+        if (_streamingCts is not null)
+        {
+            await _streamingCts.CancelAsync();
+            _streamingCts.Dispose();
+            _streamingCts = null;
+        }
+        _xAxisValue = null;
+        _yAxisValue = null;
+        _activeCellInfo = null;
     }
 
     private void OnTableDataChanged(TableData newTableData)
@@ -222,5 +398,10 @@ else
             _isStoring = false;
             await InvokeAsync(StateHasChanged);
         }
+    }
+    
+    public async ValueTask DisposeAsync()
+    {
+        await StopStreamingAsync();
     }
 }

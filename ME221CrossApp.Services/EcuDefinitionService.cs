@@ -99,6 +99,8 @@ public class EcuDefinitionService : IEcuDefinitionService
                         ObjectType: "DataLink",
                         Rows: null,
                         Cols: null,
+                        Input0LinkId: null,
+                        Input1LinkId: null,
                         Parameters: null,
                         InputLinks: null,
                         OutputLinks: null
@@ -149,6 +151,8 @@ public class EcuDefinitionService : IEcuDefinitionService
                         ObjectType: "Driver",
                         Rows: null,
                         Cols: null,
+                        Input0LinkId: null,
+                        Input1LinkId: null,
                         Parameters: parameters,
                         InputLinks: inputLinks,
                         OutputLinks: outputLinks
@@ -166,6 +170,12 @@ public class EcuDefinitionService : IEcuDefinitionService
 
                     byte? cols = null;
                     if (byte.TryParse(element.Element("cols")?.Value, out var c)) cols = c;
+                    
+                    ushort? input0LinkId = null;
+                    if (ushort.TryParse(element.Element("input_0_LinkId")?.Value, out var i0)) input0LinkId = i0;
+
+                    ushort? input1LinkId = null;
+                    if (ushort.TryParse(element.Element("input_1_LinkId")?.Value, out var i1)) input1LinkId = i1;
 
                     objects[id] = new EcuObjectDefinition(
                         Id: id,
@@ -174,6 +184,8 @@ public class EcuDefinitionService : IEcuDefinitionService
                         ObjectType: "Table",
                         Rows: rows,
                         Cols: cols,
+                        Input0LinkId: input0LinkId,
+                        Input1LinkId: input1LinkId,
                         Parameters: null,
                         InputLinks: null,
                         OutputLinks: null

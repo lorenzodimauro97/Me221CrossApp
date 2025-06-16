@@ -18,6 +18,18 @@
     [Parameter]
     public string? YAxisLabel { get; set; }
 
+    private IReadOnlyList<PointF> _cachedDataPoints = [];
+
+    protected override bool ShouldRender()
+    {
+        if (DataPoints != _cachedDataPoints)
+        {
+            _cachedDataPoints = DataPoints;
+            return true;
+        }
+        return false;
+    }
+
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
@@ -26,11 +38,7 @@
             await CreateChart();
             _hasRendered = true;
         }
-    }
-
-    protected override async Task OnParametersSetAsync()
-    {
-        if (_hasRendered && _chartModule is not null)
+        else if (_hasRendered && _chartModule is not null)
         {
             await UpdateChart();
         }
