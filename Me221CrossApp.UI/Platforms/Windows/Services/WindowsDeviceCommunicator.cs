@@ -31,7 +31,6 @@ public sealed class WindowsDeviceCommunicator(ILogger<WindowsDeviceCommunicator>
         logger.LogInformation("Opening serial port {PortName} at {BaudRate} baud.", portName, baudRate);
         _serialPort = new SerialPort(portName, baudRate)
         {
-            ReadTimeout = 500,
             WriteTimeout = 500
         };
         _serialPort.Open();

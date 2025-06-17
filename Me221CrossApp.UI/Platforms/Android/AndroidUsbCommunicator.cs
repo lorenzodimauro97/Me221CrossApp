@@ -202,7 +202,7 @@ public sealed class AndroidUsbCommunicator(ILogger<AndroidUsbCommunicator> logge
         {
             try
             {
-                var bytesRead = await _connection!.BulkTransferAsync(_inEndpoint, readBuffer, readBuffer.Length, 50);
+                var bytesRead = await _connection!.BulkTransferAsync(_inEndpoint, readBuffer, readBuffer.Length, 0);
                 if (bytesRead > 0)
                 {
                     var currentPosition = processingStream.Position;
@@ -212,12 +212,28 @@ public sealed class AndroidUsbCommunicator(ILogger<AndroidUsbCommunicator> logge
                 }
 
                 while (await TryProcessFrame(processingStream, token)) { }
+
+                if (processingStream.Position > 0)
+                {
+                    var remaining = processingStream.Length - processingStream.Position;
+                    if (remaining > 0)
+                    {
+                        var internalBuffer = processingStream.GetBuffer();
+                        Buffer.BlockCopy(internalBuffer, (int)processingStream.Position, internalBuffer, 0, (int)remaining);
+                        processingStream.SetLength(remaining);
+                    }
+                    else
+                    {
+                        processingStream.SetLength(0);
+                    }
+                    processingStream.Position = 0;
+                }
             }
             catch (OperationCanceledException) { break; }
             catch (Exception ex) 
             {
                 logger.LogError(ex, "Error in Android USB read loop.");
-                await Task.Delay(50, token); 
+                await Task.Delay(100, token); 
             }
         }
     }
@@ -278,11 +294,6 @@ public sealed class AndroidUsbCommunicator(ILogger<AndroidUsbCommunicator> logge
         else
         {
             await _incomingMessageChannel.Writer.WriteAsync(message, token);
-        }
-
-        if (stream.Position == stream.Length)
-        {
-            stream.SetLength(0);
         }
         
         return true;
