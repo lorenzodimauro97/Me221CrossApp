@@ -36,7 +36,7 @@ public sealed class AndroidUsbCommunicator(ILogger<AndroidUsbCommunicator> logge
         }
         _pendingCommands.Clear();
         
-        logger.LogInformation("Attempting to connect to Android USB device {PortName}", portName);
+        //logger.LogInformation("Attempting to connect to Android USB device {PortName}", portName);
         _usbManager = Application.Context.GetSystemService(Context.UsbService) as UsbManager;
         if (_usbManager is null)
         {
@@ -46,17 +46,17 @@ public sealed class AndroidUsbCommunicator(ILogger<AndroidUsbCommunicator> logge
         _device = _usbManager.DeviceList?.Values.FirstOrDefault(d => d.DeviceName == portName);
         if (_device is null)
         {
-            logger.LogWarning("USB device {PortName} not found.", portName);
+            //logger.LogWarning("USB device {PortName} not found.", portName);
             throw new InvalidOperationException($"Device {portName} not found.");
         }
 
         if (!_usbManager.HasPermission(_device))
         {
-            logger.LogInformation("Requesting USB permission for device {PortName}", portName);
+            //logger.LogInformation("Requesting USB permission for device {PortName}", portName);
             var permissionGranted = await RequestPermissionAsync(_usbManager, _device, cancellationToken);
             if (!permissionGranted)
             {
-                logger.LogError("USB permission denied for device {PortName}", portName);
+                //logger.LogError("USB permission denied for device {PortName}", portName);
                 throw new UnauthorizedAccessException("Permission denied for USB device.");
             }
         }
@@ -94,11 +94,11 @@ public sealed class AndroidUsbCommunicator(ILogger<AndroidUsbCommunicator> logge
 
         if (!IsConnected)
         {
-            logger.LogError("Could not establish a connection to a compatible USB device interface on {PortName}", portName);
+            //logger.LogError("Could not establish a connection to a compatible USB device interface on {PortName}", portName);
             throw new InvalidOperationException("Could not establish a connection to the compatible USB device interface.");
         }
 
-        logger.LogInformation("Successfully connected to Android USB device {PortName}", portName);
+        //logger.LogInformation("Successfully connected to Android USB device {PortName}", portName);
         if (_cts != null)
         {
             await _cts.CancelAsync();
@@ -151,7 +151,7 @@ public sealed class AndroidUsbCommunicator(ILogger<AndroidUsbCommunicator> logge
 
         if (bytesSent < frame.Length)
         {
-            logger.LogError("Failed to send full message to USB device. Sent {BytesSent} of {FrameLenth} bytes.", bytesSent, frame.Length);
+            //logger.LogError("Failed to send full message to USB device. Sent {BytesSent} of {FrameLenth} bytes.", bytesSent, frame.Length);
             throw new IOException("Failed to send full message.");
         }
     }
@@ -160,7 +160,7 @@ public sealed class AndroidUsbCommunicator(ILogger<AndroidUsbCommunicator> logge
     {
         if (!IsConnected || _cts is null) throw new InvalidOperationException("Device is not connected.");
 
-        logger.LogTrace("Sending message with Class={Class}, Command={Command}", request.Class, request.Command);
+        //logger.LogTrace("Sending message with Class={Class}, Command={Command}", request.Class, request.Command);
         var tcs = new TaskCompletionSource<Message>(TaskCreationOptions.RunContinuationsAsynchronously);
         var correlationId = (ushort)(request.Class << 8 | request.Command);
 
@@ -177,7 +177,7 @@ public sealed class AndroidUsbCommunicator(ILogger<AndroidUsbCommunicator> logge
 
             if (completedTask != tcs.Task)
             {
-                logger.LogWarning("Timeout waiting for response from USB device for message with Class={Class}, Command={Command}", request.Class, request.Command);
+                //logger.LogWarning("Timeout waiting for response from USB device for message with Class={Class}, Command={Command}", request.Class, request.Command);
                 throw new TimeoutException("The operation has timed out.");
             }
             return await tcs.Task;
@@ -202,7 +202,7 @@ public sealed class AndroidUsbCommunicator(ILogger<AndroidUsbCommunicator> logge
         {
             try
             {
-                var bytesRead = await _connection!.BulkTransferAsync(_inEndpoint, readBuffer, readBuffer.Length, 0);
+                var bytesRead = await _connection!.BulkTransferAsync(_inEndpoint, readBuffer, readBuffer.Length, 100);
                 if (bytesRead > 0)
                 {
                     var currentPosition = processingStream.Position;
@@ -245,7 +245,7 @@ public sealed class AndroidUsbCommunicator(ILogger<AndroidUsbCommunicator> logge
 
         if (stream.ReadByte() != SyncByte1 || stream.ReadByte() != SyncByte2)
         {
-            logger.LogTrace("Sync bytes not found, advancing stream.");
+            //logger.LogTrace("Sync bytes not found, advancing stream.");
             stream.Position = startPosition + 1;
             return true;
         }
@@ -277,7 +277,7 @@ public sealed class AndroidUsbCommunicator(ILogger<AndroidUsbCommunicator> logge
 
         if (receivedCrc != expectedCrc)
         {
-            logger.LogWarning("Invalid CRC on frame from USB device. Frame dropped.");
+            //logger.LogWarning("Invalid CRC on frame from USB device. Frame dropped.");
             stream.Position = startPosition + 1;
             return true;
         }
@@ -325,7 +325,7 @@ public sealed class AndroidUsbCommunicator(ILogger<AndroidUsbCommunicator> logge
 
     public async ValueTask DisposeAsync()
     {
-        logger.LogInformation("Disposing Android USB communicator.");
+        //logger.LogInformation("Disposing Android USB communicator.");
         if (_cts != null)
         {
             await _cts.CancelAsync();
